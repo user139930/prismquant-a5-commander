@@ -1,0 +1,17 @@
+# 密鑰與本機設定
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+
+# 執行期
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
