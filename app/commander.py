@@ -15,6 +15,32 @@ SYSTEM = (
     "注意：A3 執行與 A4 風控目前尚未接入，風控部分以一句話聲明即可。"
 )
 
+# A1 / A2 未連線時的內建示例資料（獨立演示用，會明確標示為示例）
+SAMPLE_NEWS = {
+    "events": [
+        {"title": "示例：美聯儲官員暗示若通脹持續回落將放緩加息節奏",
+         "sentiment": "利多", "topics": ["利率"], "summary": "（示例新聞）"},
+        {"title": "示例：芯片出口新規引發供應鏈擔憂",
+         "sentiment": "利空", "topics": ["半導體", "供應鏈"], "summary": "（示例新聞）"},
+        {"title": "示例：原油庫存意外下降帶動油價走高",
+         "sentiment": "利多", "topics": ["能源"], "summary": "（示例新聞）"},
+    ]
+}
+
+SAMPLE_POLITICAL = {
+    "events": [
+        {"title": "示例：央行官員談通脹與貨幣政策前景",
+         "summary": "通脹壓力正在緩和，貨幣政策仍有進一步調整空間。",
+         "direction": "中性", "markets": ["美股", "外匯"]},
+        {"title": "示例：貿易代表談關鍵行業關稅措施",
+         "summary": "將重新評估對關鍵行業的關稅措施，並與主要夥伴磋商。",
+         "direction": "利空", "markets": ["美股", "港股"]},
+        {"title": "示例：財政官員談金融科技監管",
+         "summary": "計劃推出新一輪金融科技監管指引。",
+         "direction": "中性", "markets": ["港股"]},
+    ]
+}
+
 
 def _fetch_a1(limit: int = 6):
     try:
@@ -53,7 +79,12 @@ def _fmt_a2(a2: dict) -> str:
 
 def run(question: str = ""):
     a1, a1_ok = _fetch_a1()
+    if not a1_ok:
+        a1 = SAMPLE_NEWS
     a2, a2_ok = _fetch_a2()
+    if not a2_ok:
+        a2 = SAMPLE_POLITICAL
+    sample_mode = not (a1_ok and a2_ok)
 
     q = question.strip() or "生成今天的晨報"
     prompt = (
@@ -81,4 +112,6 @@ def run(question: str = ""):
         "disagreements": brief.get("disagreements", []),
         "risk_note": brief.get("risk_note", ""),
         "upstream_ok": {"a1": a1_ok, "a2": a2_ok},
+        "sample_mode": sample_mode,
+        "note": "部分上游（A1/A2）未連線，指揮官改用內建示例資料演示。" if sample_mode else "",
     }

@@ -46,6 +46,7 @@ button:disabled{opacity:.5;cursor:default}
 .dis .s{font-size:13px;color:#3a4654;margin-top:6px}
 .dis .s span{color:var(--muted)}
 .risk{margin-top:8px;color:var(--red);font-size:13px}
+.note{margin-bottom:12px;background:#fff8f0;border:1px solid #f0dfc8;border-radius:8px;padding:10px 14px;color:#8a6d3b;font-size:13px}
 .pipeline{margin-top:28px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px 18px}
 .pipeline .tt{font-size:12px;color:var(--muted);margin-bottom:10px;letter-spacing:.5px}
 .pipeline .steps{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -89,6 +90,7 @@ function loading(t){$('#out').innerHTML='<div class="loading"><div class="pulse"
 function render(d){
   if(d.detail){$('#out').innerHTML='<div class="loading">出錯：'+esc(d.detail.message||d.detail)+'</div>';return}
   let h='';
+  if(d.note){h+='<div class="note">ℹ '+esc(d.note)+'</div>';}
   h+='<div class="card"><h2 class="headline">'+esc(d.headline)+'</h2>'+
      (d.question?'<p class="qtxt">你的問題：'+esc(d.question)+'</p>':'')+
      '<div class="brief">'+esc(d.brief)+'</div></div>';
