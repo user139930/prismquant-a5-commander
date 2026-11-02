@@ -5,12 +5,17 @@
     GET  /health
     POST /api/v1/commander/run   body: {"question": "..."}
 """
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from app import commander
 from app.config import settings
+
+DEMO_PAGE = (Path(__file__).parent / "demo.html").read_text(encoding="utf-8")
 
 app = FastAPI(
     title=settings.service_name,
@@ -29,6 +34,11 @@ if settings.cors_origins:
 
 class RunRequest(BaseModel):
     question: str = ""
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def index():
+    return DEMO_PAGE
 
 
 @app.get("/health")
