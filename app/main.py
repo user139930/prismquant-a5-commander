@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
 from app import commander
@@ -21,6 +21,8 @@ app = FastAPI(
     title=settings.service_name,
     version="0.1.0",
     description="PrismQuant A5 指揮官智能體：匯總 A1 新聞與 A2 政要監控，產出晨報與證據鏈。",
+    docs_url=None,
+    redoc_url=None,
 )
 
 if settings.cors_origins:
@@ -39,6 +41,12 @@ class RunRequest(BaseModel):
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def index():
     return DEMO_PAGE
+
+
+@app.get("/docs", include_in_schema=False)
+@app.get("/redoc", include_in_schema=False)
+def _redirect_docs():
+    return RedirectResponse(url="/")
 
 
 @app.get("/health")
