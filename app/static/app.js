@@ -100,14 +100,14 @@ function setBusy(btn, busy, label) {
 
 /* ---------------------------------------------------------------- 導航 */
 
-function switchView(view) {
+function switchView(view, keepHash) {
   S.view = view;
   $$('.nav-item').forEach(b => b.classList.toggle('is-active', b.dataset.view === view));
   $$('.view').forEach(v => v.classList.toggle('is-active', v.id === 'view-' + view));
   const meta = VIEW_META[view] || VIEW_META.brief;
   $('#crumb').textContent = `${meta[0]} · ${meta[1]}`;
   $('#viewTitle').textContent = meta[2];
-  if (location.hash !== '#' + view) history.replaceState(null, '', '#' + view);
+  if (!keepHash && location.hash !== '#' + view) history.replaceState(null, '', '#' + view);
   $('.main').scrollTo({ top: 0, behavior: 'smooth' });
   if (view === 'brain') loadBrain();
   if (view === 'runs') loadRuns();
@@ -197,8 +197,10 @@ function renderBrief(p) {
       <span class="meta-item">${q.distinct_publishers || 0} 個獨立媒體</span>
       <span class="meta-item">${(p.evidence || []).length} 條證據</span>
       <span class="meta-item">${(p.conflicts || []).length} 組分歧</span>
+      ${p.usage && p.usage.total_tokens ? `<span class="meta-item">${p.usage.total_tokens.toLocaleString()} tokens${p.usage.priced && p.usage.cost_usd ? ' · ≈ US$' + p.usage.cost_usd.toFixed(4) : ''}</span>` : ''}
       <div class="hero-actions">
         <button class="btn btn-ghost btn-sm" id="btnCopy">複製全文</button>
+        <button class="btn btn-ghost btn-sm" id="btnMd">匯出 .md</button>
         <button class="btn btn-ghost btn-sm" id="btnTg">Telegram 預覽</button>
         <button class="btn btn-ghost btn-sm" id="btnReplaySelf">重播</button>
       </div>
@@ -275,6 +277,7 @@ function renderBrief(p) {
     <div class="hint" style="margin-top:8px">${esc(p.disclaimer || '')}</div>`;
 
   out.innerHTML = (notes.length ? `<div class="banner-row">${notes.join('')}</div>` : '') + hero +
+    `<div id="diffSlot"></div>` +
     `<div class="stack">
       ${secBlock('1', '發生了什麼', 'FACTS', bullets(s.what_happened))}
       ${secBlock('2', '這意味著什麼', 'SO WHAT', bullets(s.so_what))}
@@ -291,14 +294,99 @@ function renderBrief(p) {
       <section class="sec"><div class="sec-head"><span class="sec-num">D</span><h3>資料充分性</h3><span class="sec-sub">DATA QUALITY</span></div>${qualityInner}</section>
       <section class="sec"><div class="sec-head"><span class="sec-num">C</span><h3>置信度</h3><span class="sec-sub">CONFIDENCE</span></div>${confInner}</section>
     </div>
-    ${secBlock('G', '合規與風險聲明', 'GUARDRAIL', guardInner)}`;
+    ${secBlock('G', '合規與風險聲明', 'GUARDRAIL', guardInner)}
+    <section class="sec">
+      <div class="sec-head"><span class="sec-num">?</span><h3>追問指揮官</h3><span class="sec-sub">FOLLOW-UP</span></div>
+      <p class="hint">只基於這份晨報的證據回答；晨報裡沒有的，會直接說沒有。</p>
+      <div class="ask-chips">
+        <button class="chip" data-follow="為什麼把關稅判成偏空？">為什麼關稅偏空？</button>
+        <button class="chip" data-follow="如果只看港股，這份晨報該怎麼讀？">只看港股怎麼讀？</button>
+        <button class="chip" data-follow="哪一條證據最不可靠？為什麼？">哪條證據最弱？</button>
+      </div>
+      <div class="chat-log" id="chatLog"></div>
+      <div class="ask-row">
+        <input id="followInput" class="input" placeholder="追問，例如：這個判斷最可能錯在哪裡？">
+        <button class="btn btn-primary" id="btnFollow">追問</button>
+      </div>
+    </section>`;
 
   renderStatus(p);
   $('#footRun').textContent = `run ${p.run_id || '—'} · ${p.stats ? p.stats.latency_ms + 'ms' : ''}`;
 
   $('#btnCopy').onclick = () => copyText(p.brief_text || '');
+  const mdBtn = $('#btnMd');
+  if (mdBtn) mdBtn.onclick = () => downloadText('prismquant-brief-' + (p.run_id || 'x') + '.md', briefMarkdown(p));
   $('#btnTg').onclick = () => openTelegram(p);
   $('#btnReplaySelf').onclick = () => replayRun(p.run_id);
+  $$('#briefOut .chip[data-follow]').forEach(b => b.onclick = () => followUp(b.dataset.follow));
+  const fi = $('#followInput');
+  if (fi) fi.addEventListener('keydown', e => { if (e.key === 'Enter') followUp(fi.value); });
+  const bf = $('#btnFollow');
+  if (bf) bf.onclick = () => followUp($('#followInput').value);
+  loadDiff(p.run_id);
+}
+
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('已匯出 ' + filename);
+}
+
+function briefMarkdown(p) {
+  const s = p.sections || {};
+  const stamp = (p.generated_at || '').replace('T', ' ').slice(0, 16);
+  const md = [];
+  md.push('# PrismQuant 晨報 · ' + stamp);
+  md.push('');
+  md.push('> ' + (p.headline || ''));
+  md.push('');
+  md.push('- Run：`' + (p.run_id || '') + '`');
+  md.push('- 模式：' + ((p.brain || {}).mode || '') + ' / ' + ((p.brain || {}).label || ''));
+  md.push('- 置信度：' + ((p.confidence || {}).score || 0) + '（' + ((p.confidence || {}).level || '') + '）');
+  md.push('- 獨立媒體：' + ((p.data_quality || {}).distinct_publishers || 0) + '｜證據 ' + ((p.evidence || []).length) + ' 條');
+  md.push('');
+  md.push('## 一、發生了什麼');
+  md.push('');
+  (s.what_happened || []).forEach(x => md.push('- ' + x));
+  md.push('');
+  md.push('## 二、這意味著什麼');
+  md.push('');
+  (s.so_what || []).forEach(x => md.push('- ' + x));
+  md.push('');
+  md.push('## 三、要盯什麼');
+  md.push('');
+  (s.watch || []).forEach(w => md.push('- **' + w.item + '**：' + w.why + '；觸發 ' + w.trigger + '；作廢 ' + w.invalidates));
+  if ((p.conflicts || []).length) {
+    md.push('');
+    md.push('## 四、分歧裁決');
+    md.push('');
+    p.conflicts.forEach(c => {
+      md.push('- **' + c.topic + '**');
+      md.push('  - A1：' + c.a1);
+      md.push('  - A2：' + c.a2);
+      md.push('  - 裁決：' + c.resolution);
+      md.push('  - 作廢：' + c.breaks_if);
+    });
+  }
+  md.push('');
+  md.push('## 證據鏈');
+  md.push('');
+  (p.evidence || []).forEach(e => md.push('- `' + e.id + '` [' + e.agent + '] ' + e.title + ' — ' + (e.publisher || '') + '｜' + (e.sentiment || '')));
+  md.push('');
+  md.push('## 置信度');
+  md.push('');
+  ((p.confidence || {}).reasons || []).forEach(r => md.push('- ' + r));
+  md.push('');
+  md.push('---');
+  md.push('');
+  md.push(p.disclaimer || '');
+  return md.join('\n');
 }
 
 async function copyText(text) {
@@ -310,26 +398,172 @@ async function copyText(text) {
   }
 }
 
+const STAGES = [
+  ['upstream', '取上游'],
+  ['analyze', '規則層分析'],
+  ['llm', '大模型改寫'],
+  ['guard', '合規檢查'],
+];
+
+function showProgress() {
+  $('#briefOut').innerHTML = `<div class="progress-card">
+    <div class="pg-head"><span><b>指揮官工作中</b>　A5 → A1 / A2 → 推理 → 護欄</span><span class="pg-timer" id="pgTimer">0.0s</span></div>
+    <ul class="pg-list" id="pgList">
+      ${STAGES.map(([k, label]) => `<li data-stage="${k}"><span class="pg-dot"></span><span class="pg-label">${label}</span><span class="pg-msg"></span></li>`).join('')}
+    </ul>
+  </div>`;
+}
+
+function pushProgress(ev) {
+  if (ev.stage === 'done') $$('#pgList li').forEach(x => { x.className = 'done'; });
+  const li = document.querySelector(`#pgList li[data-stage="${ev.stage}"]`);
+  if (li) {
+    li.className = ev.done ? 'done' : 'active';
+    const msg = li.querySelector('.pg-msg');
+    if (msg) msg.textContent = ev.message || '';
+  }
+  if (ev.upstream) {
+    const vals = $$('#statusGrid .st-val');
+    [[0, ev.upstream.a1], [1, ev.upstream.a2]].forEach(([i, ok]) => {
+      if (!vals[i]) return;
+      vals[i].className = 'st-val ' + (ok ? 'ok' : 'bad');
+      vals[i].innerHTML = '<span class="dot"></span>' + (ok ? '已連線' : '未連線');
+    });
+  }
+}
+
+async function loadStoredBrief(runId) {
+  switchView('brief', true);
+  $('#briefOut').innerHTML = `<div class="skel" style="height:120px"></div><div class="skel" style="height:180px"></div>`;
+  try {
+    const row = await api('/api/v1/runs/' + encodeURIComponent(runId));
+    history.replaceState(null, '', '#brief/' + runId);
+    renderBrief(row.payload);
+    toast('已載入 ' + ((row.created_at || '').replace('T', ' ').slice(5, 16)) + ' 的晨報');
+  } catch (e) {
+    toast('找不到這份晨報，改為生成新的', true);
+    runBrief('生成今天的晨報');
+  }
+}
+
 async function runBrief(question) {
   if (S.busy) return;
   S.busy = true;
   const btn = $('#btnRun');
-  setBusy(btn, true, '匯總中');
-  $('#briefOut').innerHTML = `<div class="skel" style="height:120px"></div><div class="skel" style="height:180px"></div>`;
+  setBusy(btn, true, S.topology && S.topology !== 'rule' ? '推理中' : '匯總中');
+  showProgress();
+  const t0 = performance.now();
+  const timer = setInterval(() => {
+    const el = $('#pgTimer');
+    if (el) el.textContent = ((performance.now() - t0) / 1000).toFixed(1) + 's';
+  }, 100);
   try {
-    const p = await api('/api/v1/commander/run', {
-      method: 'POST',
-      body: JSON.stringify({ question: question || '', topology: S.topology || undefined }),
-    });
-    renderBrief(p);
-    loadRuns(true);
+    const params = new URLSearchParams({ question: question || '' });
+    if (S.topology) params.set('topology', S.topology);
+    const res = await fetch('/api/v1/commander/stream?' + params.toString());
+    if (!res.ok || !res.body) throw new Error('串流請求失敗（HTTP ' + res.status + '）');
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        if (!chunk.startsWith('data: ')) continue;
+        let ev;
+        try { ev = JSON.parse(chunk.slice(6)); } catch (e) { continue; }
+        if (ev.type === 'progress') pushProgress(ev);
+        else if (ev.type === 'result') {
+          clearInterval(timer);
+          renderBrief(ev.payload);
+          loadRuns(true);
+        } else if (ev.type === 'error') {
+          throw new Error(ev.message || '生成失敗');
+        }
+      }
+    }
   } catch (e) {
     $('#briefOut').innerHTML = `<div class="empty"><div class="empty-mark">⚠</div><h3>這次沒跑成功</h3><p>${esc(e.message)}</p></div>`;
     toast(e.message, true);
   } finally {
+    clearInterval(timer);
     S.busy = false;
     setBusy(btn, false);
   }
+}
+
+/* ---------------------------------------------------------------- 追問 */
+
+async function followUp(question) {
+  const q = (question || '').trim();
+  if (!q || !S.brief) return;
+  const log = $('#chatLog');
+  if (!log) return;
+  log.insertAdjacentHTML('beforeend', `<div class="chat-user">${esc(q)}</div>`);
+  const bid = 'cb' + Date.now();
+  log.insertAdjacentHTML('beforeend',
+    `<div class="chat-bot" id="${bid}"><div class="cb-body"><span class="spinner" style="border-color:rgba(200,220,255,.25);border-top-color:#8ab4f8"></span>指揮官正在找證據…</div></div>`);
+  const input = $('#followInput');
+  if (input) input.value = '';
+  try {
+    const r = await api('/api/v1/commander/ask', {
+      method: 'POST',
+      body: JSON.stringify({ run_id: S.brief.run_id, question: q }),
+    });
+    const cited = (r.cited || []).map(c => `<span class="ev-chip">${esc(c)}</span>`).join('');
+    const retrieval = r.mode === 'retrieval';
+    const node = document.getElementById(bid);
+    if (node) {
+      node.innerHTML = `
+        <div class="cb-head">
+          <span class="tag ${retrieval ? 'tag-flat' : 'tag-a1'}">${retrieval ? '證據檢索' : 'A5 追問'}</span>
+          <span class="hint">${esc((r.brain && r.brain.model) || '')}</span>
+        </div>
+        <div class="cb-body">${esc(r.answer)}</div>
+        <div class="cb-foot">
+          ${cited ? `<span>引用 ${cited}</span>` : ''}
+          ${r.limits ? `<span>· ${esc(r.limits)}</span>` : ''}
+          <span>· ${r.elapsed_ms}ms</span>
+        </div>`;
+    }
+    loadRuns(true);
+  } catch (e) {
+    const node = document.getElementById(bid);
+    if (node) node.innerHTML = `<div class="cb-body">追問失敗：${esc(e.message)}</div>`;
+  }
+}
+
+/* ---------------------------------------------------------------- 與上一份的差異 */
+
+async function loadDiff(runId) {
+  const slot = $('#diffSlot');
+  if (!slot || !runId) return;
+  try {
+    const d = await api('/api/v1/commander/diff/' + encodeURIComponent(runId));
+    if (!d.has_previous) {
+      slot.innerHTML = `<div class="card diff-card">
+        <div class="card-head"><h3>與上一份的差異</h3><p>這是第一份晨報，沒有可比較的上一份。</p></div></div>`;
+      return;
+    }
+    const tags = [];
+    (d.added_topics || []).forEach(t => tags.push(`<span class="diff-tag add">+ ${esc(t)}</span>`));
+    (d.dropped_topics || []).forEach(t => tags.push(`<span class="diff-tag drop">− ${esc(t)}</span>`));
+    (d.direction_flips || []).forEach(f => tags.push(`<span class="diff-tag flip">${esc(f.topic)} ${esc(f.from)}→${esc(f.to)}</span>`));
+    const dc = d.confidence || { from: 0, to: 0, delta: 0 };
+    const arrow = dc.delta > 0 ? '↑' : dc.delta < 0 ? '↓' : '→';
+    slot.innerHTML = `<div class="card diff-card">
+      <div class="card-head"><h3>與上一份的差異</h3>
+        <p>${esc((d.previous_at || '').replace('T', ' ').slice(5, 16))} → 現在　·　新增 ${(d.new_evidence || []).length} 條證據、少了 ${(d.gone_evidence || []).length} 條</p></div>
+      <div class="diff-line" style="margin-top:10px">${esc(d.summary)}</div>
+      ${tags.length ? `<div class="diff-tags">${tags.join('')}</div>` : ''}
+      <div class="hint" style="margin-top:9px">置信度 ${(dc.from || 0).toFixed(2)} ${arrow} ${(dc.to || 0).toFixed(2)}</div>
+    </div>`;
+  } catch (e) { /* 差異卡不是必需，失敗就靜默 */ }
 }
 
 /* ---------------------------------------------------------------- Telegram */
@@ -532,6 +766,8 @@ function renderBrain() {
     <ul class="rec-why">${(rec.why || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
     <div class="rec-tradeoff">取捨：${esc(rec.trade_off || '')}</div>`;
 
+  loadWatchlist();
+
   const btn = $('#btnCompare');
   if (!d.llm_enabled) {
     btn.disabled = true;
@@ -540,6 +776,33 @@ function renderBrain() {
     btn.disabled = false;
     $('#cmpHint').textContent = '會跑兩次，產生兩個 run；可在「運行記錄」看到對照。';
   }
+}
+
+async function loadWatchlist() {
+  try {
+    const d = await api('/api/v1/watchlist');
+    renderWatchlist(d.terms || []);
+  } catch (e) { /* 靜默 */ }
+}
+
+function renderWatchlist(terms) {
+  const box = $('#wlChips');
+  if (!box) return;
+  box.innerHTML = terms.map(t => `<span class="wl-chip" data-term="${esc(t)}">${esc(t)}<i>×</i></span>`).join('')
+    || '<span class="hint">（沒有關注詞）</span>';
+  $$('#wlChips .wl-chip').forEach(chip => chip.onclick = async () => {
+    const term = chip.dataset.term;
+    const next = terms.filter(t => t !== term);
+    await saveWatchlist(next);
+  });
+}
+
+async function saveWatchlist(terms) {
+  try {
+    const d = await api('/api/v1/watchlist', { method: 'PUT', body: JSON.stringify({ terms }) });
+    renderWatchlist(d.terms || []);
+    $('#wlHint').textContent = '已儲存，下一次生成生效。';
+  } catch (e) { toast(e.message, true); }
 }
 
 async function compareBrains() {
@@ -583,7 +846,7 @@ function renderRuns(stats) {
 
   const rows = S.runs.map((r, i) => `<tr class="row-click ${S.selectedRun === r.run_id ? 'is-sel' : ''}" data-run="${esc(r.run_id)}" data-i="${i}">
       <td class="num">${esc((r.created_at || '').replace('T', ' ').slice(5, 16))}</td>
-      <td><span class="tag tag-flat">${r.kind === 'probe' ? '探針' : '晨報'}</span></td>
+      <td><span class="tag tag-flat">${r.kind === 'probe' ? '探針' : r.kind === 'answer' ? '追問' : '晨報'}</span></td>
       <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.question || '—')}</td>
       <td class="num">${esc(r.topology || '—')}</td>
       <td class="num">${(r.confidence || 0).toFixed(2)}</td>
@@ -607,10 +870,11 @@ async function showRun(runId) {
     const conf = p.confidence || {};
     $('#runDetail').innerHTML = `<div class="detail">
       <div class="detail-head">
-        <span class="tag tag-flat">${esc(row.kind === 'probe' ? '探針' : '晨報')}</span>
+        <span class="tag tag-flat">${esc(row.kind === 'probe' ? '探針' : row.kind === 'answer' ? '追問' : '晨報')}</span>
         <strong class="mono" style="font-size:12px">${esc(row.run_id)}</strong>
         <span class="hint">${esc((row.created_at || '').replace('T', ' '))} · ${esc(row.topology || '')} · prompt ${esc(row.prompt_variant || '')}</span>
-        <button class="btn btn-ghost btn-sm" id="btnReplay" style="margin-left:auto">重播並比對漂移</button>
+        <button class="btn btn-ghost btn-sm" id="btnOpenRun" style="margin-left:auto">打開這份</button>
+        <button class="btn btn-ghost btn-sm" id="btnReplay">重播並比對漂移</button>
       </div>
       <div class="hint" style="margin-bottom:10px">${esc(p.headline || (p.input || {}).title || '')}</div>
       <div class="diff-grid">
@@ -622,6 +886,8 @@ async function showRun(runId) {
       <div id="replayOut" style="margin-top:12px"></div>
     </div>`;
     $('#btnReplay').onclick = () => replayRun(runId);
+    const openBtn = $('#btnOpenRun');
+    if (openBtn) openBtn.onclick = () => { if (row.kind === 'brief') loadStoredBrief(runId); else toast('只有晨報可以獨立打開'); };
   } catch (e) {
     toast(e.message, true);
   }
@@ -737,6 +1003,26 @@ async function init() {
     doProbe(PROBE_SAMPLE.text, PROBE_SAMPLE.title, PROBE_SAMPLE.source, PROBE_SAMPLE.url);
   };
   $('#btnCompare').onclick = compareBrains;
+  const wlAdd = $('#btnWlAdd');
+  if (wlAdd) {
+    const addTerm = async () => {
+      const input = $('#wlInput');
+      const v = (input.value || '').trim();
+      if (!v) return;
+      input.value = '';
+      const cur = $$('#wlChips .wl-chip').map(c => c.dataset.term);
+      await saveWatchlist([...cur, v]);
+    };
+    wlAdd.onclick = addTerm;
+    $('#wlInput').addEventListener('keydown', e => { if (e.key === 'Enter') addTerm(); });
+    $('#btnWlReset').onclick = async () => {
+      try {
+        const d = await api('/api/v1/watchlist/reset', { method: 'POST' });
+        renderWatchlist(d.terms || []);
+        $('#wlHint').textContent = '已還原為預設值。';
+      } catch (e) { toast(e.message, true); }
+    };
+  }
 
   $('#tgClose').onclick = () => { $('#tgModal').hidden = true; };
   $('#tgModal').addEventListener('click', e => { if (e.target.id === 'tgModal') $('#tgModal').hidden = true; });
@@ -760,7 +1046,9 @@ async function init() {
   await loadBrain();
 
   const hash = (location.hash || '#brief').replace('#', '');
-  if (VIEW_META[hash] && hash !== 'brief') {
+  if (hash.startsWith('brief/')) {
+    loadStoredBrief(hash.slice(6));
+  } else if (VIEW_META[hash] && hash !== 'brief') {
     switchView(hash);
     if (hash === 'probe' && new URLSearchParams(location.search).get('autoprobe') === '1') {
       $('#probeTitle').value = PROBE_SAMPLE.title;

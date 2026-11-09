@@ -136,3 +136,78 @@ app/prompts/
 | 閱讀時間按字數算，不寫死「10 分鐘」 | 誠實的 2.2 分鐘比虛報的 10 分鐘有說服力 |
 | 分歧一定要寫 `breaks_if` | 沒有作廢條件的判斷等於不可否證，不是分析 |
 | Run Ledger 存輸入快照 | replay 要能重跑同一份輸入，才能量測「漂移」而不是「重播畫面」 |
+
+---
+
+# v0.3 擴充：接上真實大模型之後
+
+## 7. 大模型只寫「主線句 + 正文」
+
+第一次真跑（讓模型寫全部章節）得到兩個數字：**65 秒、約 1,100 輸出 tokens**。
+DeepSeek 經 OpenRouter 實測只有 15–20 tok/s，這條路在示範現場不可用。
+
+於是輸出契約縮到兩個欄位：
+
+```json
+{"headline": "主線＋限制（20 字內）", "brief": "300–420 字連續正文"}
+```
+
+`what_happened / so_what / watch` 一律由規則層產出。這不只是為了快：
+
+- **結構不會壞**：模型抽風、截斷、JSON 壞掉，只影響一句話和一段文，章節仍然完整。
+- **事實不會漂**：章節裡的數字與 ID 由程式產生，模型沒有機會改。
+- **延遲可預測**：約 20 秒，與輸入長度關係不大。
+
+驗證方式：`_validate_llm()` 只檢查 headline 長度（6–60 字）與 brief 長度（≥150 字），
+不合格就整份丟棄並降級，`brain.degraded` 會記錄原因。
+
+## 8. 進度串流（SSE）
+
+`GET /api/v1/commander/stream` 用 `StreamingResponse` 推 `text/event-stream`，
+每次 `commander.run(progress=...)` 回呼就送一個事件：
+
+```
+data: {"type":"progress","stage":"upstream","message":"呼叫 A1…","elapsed_ms":0}
+data: {"type":"progress","stage":"analyze","done":true,…}
+data: {"type":"progress","stage":"llm","message":"改寫中，約 30–60 秒"}
+data: {"type":"result","payload":{…完整晨報…}}
+```
+
+前端用 `fetch` + `ReadableStream` 逐段解析（EventSource 只支援 GET 且不能自訂 body，這裡夠用）。
+為什麼不用背景任務 + 輪詢：一次請求就是一次 run，沒有中間狀態要持久化，串流最簡單。
+
+## 9. 追問（多輪）
+
+`POST /api/v1/commander/ask {run_id, question}`：
+
+1. 從 ledger 取回那份晨報的完整 payload；
+2. 把 headline、clusters、evidence、conflicts、confidence 壓成事實包；
+3. 系統提示要求「只能用這些事實、每條結論帶 ID、300 字內、不准給保證性表述」；
+4. 回傳 `answer / cited / limits`，並以 `kind="answer"` 寫入 ledger（所以追問也可審計）。
+
+沒有 key 時退化為 `_ask_retrieval()`：按關鍵詞在證據裡找最相關的四條，明確標示
+「這是檢索，不是推理」。寧可承認不會，也不要編。
+
+## 10. 與上一份的差異
+
+`GET /api/v1/commander/diff/{run_id}` 在 ledger 裡往前找最近一份 `kind="brief"`，比對：
+
+- 主題新增／掉出（cluster label 集合差）
+- 方向翻轉（同一主題 direction 改變）
+- 置信度變化（±0.03 以上才報）
+- 新增／消失的證據 ID
+
+這是「每天看晨報」的意義所在：沒有變化時它會直接說「今天不需要改倉位」。
+
+## 11. 關注詞（使用者指令）
+
+`data/prefs.json` 存使用者的關注詞，`PUT /api/v1/watchlist` 改寫。
+`commander.run()` 每次讀 `store.get_watchlist()`，命中的詞會進入「要盯什麼」並影響重排。
+壞檔或空值時回退到 `PQ_WATCHLIST` 的預設值——使用者的設定不能讓系統起不來。
+
+## 12. 成本
+
+`payload["usage"]` 帶 `prompt_tokens / completion_tokens / cost_usd`，
+單價由 `PQ_PRICE_IN_PER_M` / `PQ_PRICE_OUT_PER_M` 決定（預設是 deepseek-chat 的量級）。
+實測一份晨報約 3,100 tokens、US$0.0011。200 個訂閱者每日一份約 US$0.22。
+這個數字寫進報告比「我們會控制成本」有用。

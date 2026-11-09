@@ -17,17 +17,20 @@
 """
 from __future__ import annotations
 
+import json
+import queue
+import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import brains, commander, connectors, guardrails, ledger, telegram
+from app import brains, commander, connectors, guardrails, ledger, store, telegram
 from app.config import settings
 
 STATIC = Path(__file__).parent / "static"
@@ -41,7 +44,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.service_name,
-    version="0.2.0",
+    version="0.3.0",
     description="PrismQuant A5 指揮官：A1 + A2 匯總、二次分析、大腦拓撲與合規護欄。",
     docs_url="/api/docs",
     redoc_url=None,
@@ -76,6 +79,15 @@ class ProbeRequest(BaseModel):
 class CompareRequest(BaseModel):
     question: str = "生成今天的晨報"
     topologies: list[str] = Field(default_factory=lambda: ["lens", "split"])
+
+
+class WatchlistRequest(BaseModel):
+    terms: list[str] = Field(default_factory=list)
+
+
+class AskRequest(BaseModel):
+    run_id: str
+    question: str
 
 
 class RenderRequest(BaseModel):
@@ -145,6 +157,62 @@ def run(req: RunRequest):
         return commander.run(req.question, req.topology)
     except Exception as exc:  # 不讓單次失敗把服務打掛
         raise HTTPException(503, detail={"code": "commander_failed", "message": str(exc)[:300]})
+
+
+@app.get("/api/v1/commander/stream")
+def run_stream(question: str = "", topology: str | None = None):
+    """SSE 版晨報：把「取上游 → 規則層 → 大模型 → 護欄」的進度即時推給前端。
+
+    大模型一次要 30–60 秒，普通 POST 會讓畫面死住；串流之後使用者看得到每個 agent 在做什麼。
+    """
+    def gen():
+        q: queue.Queue = queue.Queue()
+        box: dict = {}
+
+        def worker():
+            try:
+                box["p"] = commander.run(question, topology, progress=q.put)
+            except Exception as exc:
+                q.put({"stage": "error", "message": str(exc)[:300], "error": True})
+            finally:
+                q.put(None)
+
+        threading.Thread(target=worker, daemon=True).start()
+        while True:
+            event = q.get()
+            if event is None:
+                break
+            yield "data: " + json.dumps({"type": "progress", **event}, ensure_ascii=False) + "\n\n"
+        if "p" in box:
+            yield "data: " + json.dumps({"type": "result", "payload": box["p"]}, ensure_ascii=False) + "\n\n"
+        else:
+            yield "data: " + json.dumps({"type": "error", "message": "生成失敗，請看伺服器日誌"},
+                                        ensure_ascii=False) + "\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.post("/api/v1/commander/ask")
+def ask(req: AskRequest):
+    """對某一份晨報追問。這是 proposal F-07「接受用戶指令」的實作。"""
+    row = ledger.get(req.run_id)
+    if row is None:
+        raise HTTPException(404, detail={"code": "run_not_found", "message": "找不到這份晨報"})
+    if not (req.question or "").strip():
+        raise HTTPException(422, detail={"code": "empty_question", "message": "問題不能為空"})
+    try:
+        return commander.ask(row["payload"], req.question)
+    except Exception as exc:
+        raise HTTPException(503, detail={"code": "ask_failed", "message": str(exc)[:300]})
+
+
+@app.get("/api/v1/commander/diff/{run_id}")
+def diff(run_id: str):
+    try:
+        return commander.diff_with_previous(run_id)
+    except KeyError:
+        raise HTTPException(404, detail={"code": "run_not_found", "message": "找不到這次 run"})
 
 
 @app.post("/api/v1/commander/probe")
@@ -273,6 +341,21 @@ def brain_compare(req: CompareRequest):
 
 
 # ---------------------------------------------------------------- 合規 / Telegram
+
+@app.get("/api/v1/watchlist")
+def get_watchlist():
+    return {"terms": store.get_watchlist(), "defaults": settings.watchlist}
+
+
+@app.put("/api/v1/watchlist")
+def put_watchlist(req: WatchlistRequest):
+    return {"terms": store.set_watchlist(req.terms)}
+
+
+@app.post("/api/v1/watchlist/reset")
+def reset_watchlist():
+    return {"terms": store.reset_watchlist()}
+
 
 @app.get("/api/v1/compliance")
 def compliance():

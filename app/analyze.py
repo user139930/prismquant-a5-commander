@@ -464,7 +464,7 @@ def transmission(clusters: list[dict]) -> list[dict]:
             "strength_value": c["strength"],
             "horizon": "3–10 個交易日" if c["strength"] >= 0.6 else "1–4 週",
             "evidence": [a["id"] for a in _pick(c["atoms"], 3)],
-            "note": "已交叉驗證（%d 個媒體）" % len(c["publishers"]) if len(c["publishers"]) > 1
+            "note": "已交叉驗證 %d 個媒體" % len(c["publishers"]) if len(c["publishers"]) > 1
                     else "單一來源，方向僅供參考",
         })
     return rows[:6]

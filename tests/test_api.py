@@ -14,12 +14,16 @@ sys.path.insert(0, str(ROOT))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.config import settings  # noqa: E402
 from app.main import app  # noqa: E402
 
 
 class TestApi(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # 測試必須離線、可重現：強制規則模式，不呼叫真實大模型
+        settings.brain_topology = "rule"
+        settings.llm_api_key = ""
         cls.client = TestClient(app)
         cls.client.__enter__()
 
@@ -91,6 +95,45 @@ class TestApi(unittest.TestCase):
         r = self.client.post("/api/v1/telegram/render", json={"payload": run})
         self.assertEqual(r.status_code, 200)
         self.assertIn("晨報", r.json()["message"])
+
+    def test_stream_rule_mode(self):
+        with self.client.stream("GET", "/api/v1/commander/stream?question=stream&topology=rule") as r:
+            self.assertEqual(r.status_code, 200)
+            body = "".join(chunk for chunk in r.iter_text())
+        self.assertIn('"type": "progress"', body)
+        self.assertIn('"type": "result"', body)
+
+    def test_ask_returns_answer(self):
+        run = self.client.post("/api/v1/commander/run", json={"question": "追問用"}).json()
+        r = self.client.post("/api/v1/commander/ask",
+                             json={"run_id": run["run_id"], "question": "為什麼關稅偏空？"})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertTrue(body["answer"])
+        self.assertIn(body["mode"], ["llm", "retrieval"])
+
+    def test_ask_unknown_run(self):
+        r = self.client.post("/api/v1/commander/ask",
+                             json={"run_id": "r-nope", "question": "x"})
+        self.assertEqual(r.status_code, 404)
+
+    def test_diff_first_or_previous(self):
+        run = self.client.post("/api/v1/commander/run", json={"question": "diff 用"}).json()
+        r = self.client.get("/api/v1/commander/diff/%s" % run["run_id"])
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertIn("has_previous", body)
+        if body["has_previous"]:
+            self.assertIn("confidence", body)
+
+    def test_watchlist_roundtrip(self):
+        r = self.client.get("/api/v1/watchlist")
+        self.assertEqual(r.status_code, 200)
+        original = r.json()["terms"]
+        put = self.client.put("/api/v1/watchlist", json={"terms": ["測試詞", "半導體"]})
+        self.assertEqual(put.json()["terms"], ["測試詞", "半導體"])
+        self.client.post("/api/v1/watchlist/reset")
+        self.assertEqual(self.client.get("/api/v1/watchlist").json()["terms"], original)
 
     def test_unknown_run(self):
         r = self.client.get("/api/v1/runs/r-nope")

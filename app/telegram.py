@@ -72,7 +72,7 @@ def build_message(payload: dict) -> str:
             conf.get("score", 0), conf.get("level", ""), len(payload.get("evidence", [])),
             (payload.get("data_quality") or {}).get("distinct_publishers", 0)),
         "⚠️ %s" % payload.get("guard", {}).get("note", ""),
-        "🔗 %s/#runs/%s" % (settings.web_base_url.rstrip("/"), payload.get("run_id", "")),
+        "🔗 %s/#brief/%s" % (settings.web_base_url.rstrip("/"), payload.get("run_id", "")),
     ]
     text = "\n".join(lines)
     return text[:MAX_LEN]

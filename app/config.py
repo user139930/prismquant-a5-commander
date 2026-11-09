@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     brain_a5_model: str = "deepseek/deepseek-chat"     # 指揮層：調解、推演
     brain_a5_temperature: float = 0.2
     brain_sense_temperature: float = 0.0
+    llm_max_tokens: int = 1200
+
+    # 成本估算（USD / 1M tokens）。預設值是 deepseek-chat 在 OpenRouter 的牌價量級，
+    # 請按實際賬單調整；設成 0 就只顯示 tokens、不顯示金額。
+    price_in_per_m: float = 0.27
+    price_out_per_m: float = 1.10
 
     # ---------- 提示詞版本（之後要「訓練提示詞」就從這裡擴） ----------
     prompt_variant: str = "v1"
