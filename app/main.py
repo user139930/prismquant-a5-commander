@@ -44,7 +44,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.service_name,
-    version="0.3.0",
+    version="0.4.0",
     description="PrismQuant A5 指揮官：A1 + A2 匯總、二次分析、大腦拓撲與合規護欄。",
     docs_url="/api/docs",
     redoc_url=None,
@@ -207,6 +207,54 @@ def ask(req: AskRequest):
         raise HTTPException(503, detail={"code": "ask_failed", "message": str(exc)[:300]})
 
 
+@app.get("/api/v1/commander/compare")
+def compare(a: str, b: str):
+    try:
+        return commander.compare_runs(a, b)
+    except KeyError:
+        raise HTTPException(404, detail={"code": "run_not_found", "message": "找不到其中一份晨報"})
+    except ValueError as exc:
+        raise HTTPException(422, detail={"code": "not_comparable", "message": str(exc)})
+
+
+@app.get("/api/v1/integration")
+def integration(probe: bool = False):
+    """五代理的整合狀態：誰已接入、誰缺席、各自要交什麼契約。
+
+    這個頁面是給隊友看的：A5 沒有假裝自己有 A1–A4，缺的部分寫清楚等誰。
+    """
+    h = connectors.health()
+    agents = []
+    for aid in ("A1", "A2", "A3", "A4", "A5"):
+        meta = commander.AGENT_META[aid]
+        if aid == "A5":
+            status, note = "ok", "已交付（本服務）"
+        elif aid in ("A1", "A2"):
+            x = h[aid.lower()]
+            status = "ok" if x.get("ok") else "offline"
+            note = ("已連線 · %d ms" % (x.get("latency_ms") or 0)) if x.get("ok") \
+                else "未連線：%s" % (x.get("error") or "沒有回應")
+        else:
+            status, note = "missing", "未實作，A5 相關區塊留空"
+        agents.append({"id": aid, **meta, "status": status, "note": note})
+
+    sample = None
+    if probe:
+        a1, m1 = connectors.a1_events(3)
+        a2, m2 = connectors.a2_events(3)
+        sample = {
+            "a1": {"meta": m1, "items": a1[:2]},
+            "a2": {"meta": m2, "items": a2[:2]},
+        }
+    return {
+        "agents": agents,
+        "health": h,
+        "sample": sample,
+        "ledger": ledger.stats(),
+        "sample_data_policy": "A1/A2 離線時整份改用內建示例；分析流程、大模型、合規檢查都是真實執行。",
+    }
+
+
 @app.get("/api/v1/commander/diff/{run_id}")
 def diff(run_id: str):
     try:
@@ -228,8 +276,15 @@ def probe(req: ProbeRequest):
 # ---------------------------------------------------------------- 運行記錄
 
 @app.get("/api/v1/runs")
-def runs(limit: int = 30):
-    return {"items": ledger.list_runs(limit), "stats": ledger.stats()}
+def runs(limit: int = 30, kind: str | None = None, q: str | None = None):
+    fetch = 200 if (kind or q) else limit
+    items = ledger.list_runs(fetch)
+    if kind and kind not in ("all", ""):
+        items = [r for r in items if r["kind"] == kind]
+    if q:
+        needle = q.lower()
+        items = [r for r in items if needle in (r.get("question") or "").lower()]
+    return {"items": items[:limit], "stats": ledger.stats()}
 
 
 @app.get("/api/v1/runs/{run_id}")

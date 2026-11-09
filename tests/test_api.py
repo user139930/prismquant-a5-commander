@@ -135,6 +135,44 @@ class TestApi(unittest.TestCase):
         self.client.post("/api/v1/watchlist/reset")
         self.assertEqual(self.client.get("/api/v1/watchlist").json()["terms"], original)
 
+    def test_online_but_empty_keeps_it_blank(self):
+        # A1/A2 在線但沒有資料：不能偷偷用示例，要老實留空
+        from unittest.mock import patch
+        from app import commander as cm, connectors
+        meta = {"ok": True, "status": "connected", "latency_ms": 5, "error": None,
+                "count": 0, "empty": True, "sampled": False}
+        with patch.object(connectors, "fetch_all", return_value=(([], dict(meta)), ([], dict(meta)))):
+            p = cm.run("空資料測試", "rule")
+        self.assertFalse(p["data_quality"]["sample_mode"])
+        self.assertIn("沒有資料", p["source_note"])
+        self.assertEqual(p["evidence"], [])
+        self.assertEqual(p["coverage"]["missing"], ["A1", "A2", "A3", "A4"])
+
+    def test_dataset_switches_to_sample_when_offline(self):
+        from unittest.mock import patch
+        from app import commander as cm, connectors
+        meta = {"ok": False, "status": "offline", "latency_ms": 2, "error": "port closed"}
+        with patch.object(connectors, "fetch_all", return_value=(([], dict(meta)), ([], dict(meta)))):
+            p = cm.run("離線測試", "rule")
+        self.assertTrue(p["data_quality"]["sample_mode"])
+        self.assertGreater(len(p["evidence"]), 0)
+        self.assertIn("示例", p["source_note"])
+
+    def test_coverage_contract(self):
+        run = self.client.post("/api/v1/commander/run", json={"question": "coverage"}).json()
+        cov = run["coverage"]
+        self.assertEqual([a["id"] for a in cov["agents"]], ["A1", "A2", "A3", "A4", "A5"])
+        a3 = [a for a in cov["agents"] if a["id"] == "A3"][0]
+        self.assertEqual(a3["status"], "missing")
+        self.assertFalse(a3["present"])
+
+    def test_integration_endpoint(self):
+        r = self.client.get("/api/v1/integration")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(len(body["agents"]), 5)
+        self.assertIn("sample_data_policy", body)
+
     def test_unknown_run(self):
         r = self.client.get("/api/v1/runs/r-nope")
         self.assertEqual(r.status_code, 404)

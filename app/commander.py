@@ -147,22 +147,27 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
 
     emit("upstream", "呼叫 A1 新聞與 A2 政要監控")
     (a1, a1_meta), (a2, a2_meta) = connectors.fetch_all()
-    upstream_ok = bool(a1_meta.get("ok")) and bool(a2_meta.get("ok"))
+    a1_online = bool(a1_meta.get("ok"))
+    a2_online = bool(a2_meta.get("ok"))
     emit("upstream",
          "A1 %s（%d 條）／A2 %s（%d 條）" % (
-             "已連線" if a1_meta.get("ok") else "未連線", len(a1),
-             "已連線" if a2_meta.get("ok") else "未連線", len(a2)),
-         done=True, upstream={"a1": bool(a1_meta.get("ok")), "a2": bool(a2_meta.get("ok"))})
-    if upstream_ok:
+             "已連線" if a1_online else "未連線", len(a1),
+             "已連線" if a2_online else "未連線", len(a2)),
+         done=True, upstream={"a1": a1_online, "a2": a2_online})
+    if a1_online and a2_online:
+        # 在線但沒有資料 ≠ 離線：前者要老實留空，後者才用示例
         sample_mode = bool(a1_meta.get("sampled") or a2_meta.get("sampled"))
-        source_note = ""
+        empty = [n for n, m in (("A1 新聞", a1_meta), ("A2 政要", a2_meta)) if m.get("empty")]
+        source_note = ("%s 已連線但沒有資料（可能未執行 /collect），本頁只覆蓋有資料的部分。"
+                       % "、".join(empty)) if empty else ""
     else:
         bundle = connectors.sample_bundle()
         a1 = bundle["a1"]["events"]
         a2 = bundle["a2"]["events"]
         sample_mode = True
         failed = [name for name, meta in (("A1 新聞", a1_meta), ("A2 政要", a2_meta)) if not meta.get("ok")]
-        source_note = "上游 %s 未連線，整份晨報改用內建示例資料（不真假混用）。" % "、".join(failed)
+        source_note = ("上游 %s 未連線，資料改用內建示例（分析流程是真實執行的，只有輸入是示例）。"
+                       % "、".join(failed))
 
     upstream_meta = {
         "a1": {**a1_meta, "name": "A1 新聞情報"},
@@ -215,6 +220,7 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
         "llm_meta": llm_meta,
     }
     payload["source_note"] = source_note
+    payload["coverage"] = coverage(upstream_meta, sample_mode)
     payload["kind"] = "brief"
 
     if not payload.get("brief_text"):
@@ -394,12 +400,89 @@ def probe(title: str, text: str, source: str = "", url: str = "") -> dict:
     return result
 
 
+# ---------------------------------------------------------------- 五代理覆蓋範圍
+
+AGENT_META = {
+    "A1": {"name": "新聞情報", "owner": "隊友", "role": "感知",
+           "needs": "多來源 RSS（多於一家）、把媒體名寫進 source 欄位（現在只有 \"RSS\"）"},
+    "A2": {"name": "政要監控", "owner": "隊友", "role": "感知",
+           "needs": "/api/v1/analyses 回傳 direction、entities、markets、confidence"},
+    "A3": {"name": "執行代理", "owner": "隊友", "role": "決策",
+           "needs": "GET /api/v1/intents：instrument、direction、size_range、logic、evidence_ids"},
+    "A4": {"name": "風控代理", "owner": "隊友", "role": "閘門",
+           "needs": "GET /api/v1/risk/check：verdict（pass/degrade/reject）、limits、reasons"},
+    "A5": {"name": "指揮官", "owner": "本 repo", "role": "編排",
+           "needs": "已交付：匯總、二次分析、證據鏈、合規、交付"},
+}
+
+
+def coverage(upstream_meta: dict, sample_mode: bool) -> dict:
+    """A5 必須講清楚「這一頁用了誰的資料、缺誰」。
+
+    缺的部分不是用假數據填滿，而是留空並寫明等誰——這是隊友接手整合時最小摩擦的做法。
+    """
+    out = []
+    for aid in ("A1", "A2"):
+        m = upstream_meta.get(aid.lower()) or {}
+        if not m.get("ok"):
+            status, present, note = "offline", False, "未連線，本頁改用示例資料"
+        elif m.get("empty"):
+            status, present, note = "empty", False, "已連線但沒有資料（未執行 /collect？）"
+        else:
+            status, present, note = "ok", True, "已接入 %d 條" % (m.get("count") or 0)
+        out.append({"id": aid, **AGENT_META[aid], "status": status,
+                    "present": present, "note": note})
+
+    out.append({"id": "A3", **AGENT_META["A3"], "status": "missing", "present": False,
+                "note": "未實作：本頁不產生任何標的建議或下單意圖，相關區塊留空"})
+    out.append({"id": "A4", **AGENT_META["A4"], "status": "missing", "present": False,
+                "note": "未接入：A5 只有建議權（advisory_only），沒有風控裁決"})
+    out.append({"id": "A5", **AGENT_META["A5"], "status": "ok", "present": True,
+                "note": "本服務"})
+
+    return {
+        "agents": out,
+        "missing": [a["id"] for a in out if not a["present"]],
+        "sample_mode": sample_mode,
+        "summary": "已接入：%s｜缺席：%s" % (
+            "、".join(a["id"] for a in out if a["present"]) or "無",
+            "、".join(a["id"] for a in out if not a["present"]) or "無"),
+    }
+
+
 def _now_iso() -> str:
     from datetime import datetime
     return datetime.now(analyze.HK_TZ).isoformat(timespec="seconds")
 
 
 # ---------------------------------------------------------------- 與上一份的差異
+
+def _diff_payloads(cur: dict, prev: dict) -> dict:
+    """比較兩份晨報 payload 的結構化差異（不含 ledger 元資料）。"""
+    cur_map = {c["label"]: c for c in cur.get("clusters", [])}
+    prev_map = {c["label"]: c for c in prev.get("clusters", [])}
+    added = [k for k in cur_map if k not in prev_map]
+    dropped = [k for k in prev_map if k not in cur_map]
+    flipped = [{"topic": k, "from": prev_map[k]["direction"], "to": cur_map[k]["direction"]}
+               for k in cur_map if k in prev_map and cur_map[k]["direction"] != prev_map[k]["direction"]]
+
+    cur_ids = {e["id"] for e in cur.get("evidence", [])}
+    prev_ids = {e["id"] for e in prev.get("evidence", [])}
+    cur_conf = (cur.get("confidence") or {}).get("score", 0)
+    prev_conf = (prev.get("confidence") or {}).get("score", 0)
+
+    return {
+        "headline": {"from": prev.get("headline"), "to": cur.get("headline"),
+                     "changed": prev.get("headline") != cur.get("headline")},
+        "confidence": {"from": prev_conf, "to": cur_conf, "delta": round(cur_conf - prev_conf, 3)},
+        "added_topics": added,
+        "dropped_topics": dropped,
+        "direction_flips": flipped,
+        "new_evidence": sorted(cur_ids - prev_ids),
+        "gone_evidence": sorted(prev_ids - cur_ids),
+        "summary": _diff_sentence(added, dropped, flipped, cur_conf - prev_conf),
+    }
+
 
 def diff_with_previous(run_id: str) -> dict:
     """「今天比上一份多了什麼」——這是每日晨報真正的價值，也是 ledger 的用途。"""
@@ -414,36 +497,31 @@ def diff_with_previous(run_id: str) -> dict:
     if prev_row is None:
         return {"has_previous": False, "note": "這是第一份晨報，沒有可比對的上一份。"}
 
-    prev = ledger.get(prev_row["run_id"])["payload"]
-    cur = cur_row["payload"]
+    out = _diff_payloads(cur_row["payload"], ledger.get(prev_row["run_id"])["payload"])
+    out.update({"has_previous": True,
+                "previous_run_id": prev_row["run_id"],
+                "previous_at": prev_row["created_at"]})
+    return out
 
-    cur_map = {c["label"]: c for c in cur.get("clusters", [])}
-    prev_map = {c["label"]: c for c in prev.get("clusters", [])}
-    added = [k for k in cur_map if k not in prev_map]
-    dropped = [k for k in prev_map if k not in cur_map]
-    flipped = [{"topic": k, "from": prev_map[k]["direction"], "to": cur_map[k]["direction"]}
-               for k in cur_map if k in prev_map and cur_map[k]["direction"] != prev_map[k]["direction"]]
 
-    cur_ids = {e["id"] for e in cur.get("evidence", [])}
-    prev_ids = {e["id"] for e in prev.get("evidence", [])}
-
-    cur_conf = (cur.get("confidence") or {}).get("score", 0)
-    prev_conf = (prev.get("confidence") or {}).get("score", 0)
-
-    return {
+def compare_runs(base_run_id: str, target_run_id: str) -> dict:
+    """任選兩份晨報比較。歷史記錄頁的「選兩份比較」用它。"""
+    a = ledger.get(base_run_id)
+    b = ledger.get(target_run_id)
+    if a is None or b is None:
+        raise KeyError("run_not_found")
+    if a["kind"] != "brief" or b["kind"] != "brief":
+        raise ValueError("只支援比較兩份晨報")
+    out = _diff_payloads(b["payload"], a["payload"])
+    out.update({
         "has_previous": True,
-        "previous_run_id": prev_row["run_id"],
-        "previous_at": prev_row["created_at"],
-        "headline": {"from": prev.get("headline"), "to": cur.get("headline"),
-                     "changed": prev.get("headline") != cur.get("headline")},
-        "confidence": {"from": prev_conf, "to": cur_conf, "delta": round(cur_conf - prev_conf, 3)},
-        "added_topics": added,
-        "dropped_topics": dropped,
-        "direction_flips": flipped,
-        "new_evidence": sorted(cur_ids - prev_ids),
-        "gone_evidence": sorted(prev_ids - cur_ids),
-        "summary": _diff_sentence(added, dropped, flipped, cur_conf - prev_conf),
-    }
+        "mode": "pair",
+        "base": {"run_id": base_run_id, "at": a["created_at"],
+                 "headline": a["payload"].get("headline")},
+        "target": {"run_id": target_run_id, "at": b["created_at"],
+                   "headline": b["payload"].get("headline")},
+    })
+    return out
 
 
 def _diff_sentence(added, dropped, flipped, delta) -> str:

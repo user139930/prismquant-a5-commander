@@ -8,7 +8,8 @@ const VIEW_META = {
   brief: ['晨報', 'MORNING BRIEF', '今日決策輸入'],
   probe: ['單篇探針', 'SINGLE-NEWS PROBE', '一篇新聞，四個問題'],
   brain: ['大腦拓撲', 'BRAIN TOPOLOGY', '同一個大腦，還是不同大腦？'],
-  runs: ['運行記錄', 'RUN LEDGER', '可重播的決策'],
+  runs: ['歷史記錄', 'HISTORY', '時間軸與重播'],
+  integration: ['整合狀態', 'WIRING', '五個代理的接線狀態'],
   compliance: ['合規', 'GUARDRAILS', '對外說話前的最後一道閘'],
 };
 
@@ -112,6 +113,7 @@ function switchView(view, keepHash) {
   if (view === 'brain') loadBrain();
   if (view === 'runs') loadRuns();
   if (view === 'compliance') loadCompliance();
+  if (view === 'integration') loadIntegration();
 }
 
 /* ---------------------------------------------------------------- 狀態 */
@@ -276,7 +278,20 @@ function renderBrief(p) {
     </div>
     <div class="hint" style="margin-top:8px">${esc(p.disclaimer || '')}</div>`;
 
-  out.innerHTML = (notes.length ? `<div class="banner-row">${notes.join('')}</div>` : '') + hero +
+  const cov = p.coverage || {};
+  const covChips = (cov.agents || []).map(a => {
+    const cls = a.present ? 'ok' : (a.status === 'empty' ? 'warn' : 'missing');
+    const label = a.status === 'ok' ? a.note : (a.status === 'empty' ? '在線但無資料' : (a.status === 'offline' ? '未連線' : '未實作'));
+    return `<span class="cov-chip ${cls}" title="${esc(a.note)}${a.needs ? '｜需要：' + esc(a.needs) : ''}"><b>${esc(a.id)}</b>${esc(a.name)}<em>${esc(label)}</em></span>`;
+  }).join('');
+  const missingNotes = (cov.agents || []).filter(a => a.status === 'missing').map(a => `${a.id} ${a.name}：${a.note}`);
+  const covBlock = (cov.agents || []).length ? `<div class="coverage">
+      <div class="cov-head"><span>這一頁用了誰的資料</span><span class="hint">${esc(cov.summary || '')}</span></div>
+      <div class="cov-row">${covChips}</div>
+      ${missingNotes.length ? `<div class="cov-note">${missingNotes.map(esc).join('　·　')}</div>` : ''}
+    </div>` : '';
+
+  out.innerHTML = (notes.length ? `<div class="banner-row">${notes.join('')}</div>` : '') + hero + covBlock +
     `<div id="diffSlot"></div>` +
     `<div class="stack">
       ${secBlock('1', '發生了什麼', 'FACTS', bullets(s.what_happened))}
@@ -287,7 +302,18 @@ function renderBrief(p) {
       <thead><tr><th>起點</th><th>通道</th><th>標的</th><th>方向</th><th>強度</th><th>時間尺度</th><th>證據</th></tr></thead>
       <tbody>${transRows || '<tr><td colspan="7" class="hint">（無）</td></tr>'}</tbody></table></div>`)}
     ${conflictBlocks ? secBlock('5', '分歧裁決', 'CONFLICT', conflictBlocks) : ''}
-    ${secBlock(conflictBlocks ? '6' : '5', '情境推演', 'SCENARIOS', `<div class="scn-grid">${scnCards}</div>
+    ${secBlock(conflictBlocks ? '6' : '5', '情境推演', 'SCENARIOS', `<div class="scn-grid">${scnCards}
+        <div class="scn pos empty">
+          <div class="scn-top"><span class="scn-name">倉位含義</span><span class="scn-prob">—</span></div>
+          <p>留空：需要 A4 風控回報 gate 狀態，A5 才能講倉位。目前 A4 未接入，這一段不生成。</p>
+          <div class="trig">等 A4 提供 /api/v1/risk/check</div>
+        </div>
+        <div class="scn pos empty">
+          <div class="scn-top"><span class="scn-name">執行意圖</span><span class="scn-prob">—</span></div>
+          <p>留空：A3 未實作，本頁不產生任何標的建議或下單意圖，只做研究輸出。</p>
+          <div class="trig">等 A3 提供 /api/v1/intents</div>
+        </div>
+      </div>
       <div class="hint" style="margin-top:10px">情境權重由情緒分佈與交叉驗證強度加權得出，是可解釋的相對權重，不是價格預測。</div>`)}
     ${secBlock(conflictBlocks ? '7' : '6', '證據鏈', 'EVIDENCE', `<div class="ev-list">${evRows || '<div class="hint">（無）</div>'}</div>`)}
     <div class="two-col">
@@ -295,6 +321,10 @@ function renderBrief(p) {
       <section class="sec"><div class="sec-head"><span class="sec-num">C</span><h3>置信度</h3><span class="sec-sub">CONFIDENCE</span></div>${confInner}</section>
     </div>
     ${secBlock('G', '合規與風險聲明', 'GUARDRAIL', guardInner)}
+    <details class="raw-box">
+      <summary>原始資料（給驗收與除錯用）</summary>
+      <pre class="raw-pre">${esc(JSON.stringify(p, null, 2))}</pre>
+    </details>
     <section class="sec">
       <div class="sec-head"><span class="sec-num">?</span><h3>追問指揮官</h3><span class="sec-sub">FOLLOW-UP</span></div>
       <p class="hint">只基於這份晨報的證據回答；晨報裡沒有的，會直接說沒有。</p>
@@ -550,20 +580,29 @@ async function loadDiff(runId) {
         <div class="card-head"><h3>與上一份的差異</h3><p>這是第一份晨報，沒有可比較的上一份。</p></div></div>`;
       return;
     }
-    const tags = [];
-    (d.added_topics || []).forEach(t => tags.push(`<span class="diff-tag add">+ ${esc(t)}</span>`));
-    (d.dropped_topics || []).forEach(t => tags.push(`<span class="diff-tag drop">− ${esc(t)}</span>`));
-    (d.direction_flips || []).forEach(f => tags.push(`<span class="diff-tag flip">${esc(f.topic)} ${esc(f.from)}→${esc(f.to)}</span>`));
-    const dc = d.confidence || { from: 0, to: 0, delta: 0 };
-    const arrow = dc.delta > 0 ? '↑' : dc.delta < 0 ? '↓' : '→';
-    slot.innerHTML = `<div class="card diff-card">
-      <div class="card-head"><h3>與上一份的差異</h3>
-        <p>${esc((d.previous_at || '').replace('T', ' ').slice(5, 16))} → 現在　·　新增 ${(d.new_evidence || []).length} 條證據、少了 ${(d.gone_evidence || []).length} 條</p></div>
-      <div class="diff-line" style="margin-top:10px">${esc(d.summary)}</div>
-      ${tags.length ? `<div class="diff-tags">${tags.join('')}</div>` : ''}
-      <div class="hint" style="margin-top:9px">置信度 ${(dc.from || 0).toFixed(2)} ${arrow} ${(dc.to || 0).toFixed(2)}</div>
-    </div>`;
+    slot.innerHTML = diffMarkup(d, false);
   } catch (e) { /* 差異卡不是必需，失敗就靜默 */ }
+}
+
+/* ---------------------------------------------------------------- 兩份比較 */
+
+function diffMarkup(d, pair) {
+  const tags = [];
+  (d.added_topics || []).forEach(t => tags.push(`<span class="diff-tag add">+ ${esc(t)}</span>`));
+  (d.dropped_topics || []).forEach(t => tags.push(`<span class="diff-tag drop">− ${esc(t)}</span>`));
+  (d.direction_flips || []).forEach(f => tags.push(`<span class="diff-tag flip">${esc(f.topic)} ${esc(f.from)}→${esc(f.to)}</span>`));
+  const dc = d.confidence || { from: 0, to: 0, delta: 0 };
+  const arrow = dc.delta > 0 ? '↑' : dc.delta < 0 ? '↓' : '→';
+  const head = (pair && d.base && d.target)
+    ? `<div class="cmp-head"><div><span class="hint">基準</span>${esc((d.base.at || '').slice(5, 16))}　${esc(d.base.headline || '')}</div>
+       <div><span class="hint">對比</span>${esc((d.target.at || '').slice(5, 16))}　${esc(d.target.headline || '')}</div></div>`
+    : '';
+  return `<div class="card diff-card">
+    ${head}
+    <div class="diff-line">${esc(d.summary)}</div>
+    ${tags.length ? `<div class="diff-tags">${tags.join('')}</div>` : ''}
+    <div class="hint" style="margin-top:9px">置信度 ${(dc.from || 0).toFixed(2)} ${arrow} ${(dc.to || 0).toFixed(2)}　·　新增 ${(d.new_evidence || []).length} 條證據、少了 ${(d.gone_evidence || []).length} 條</div>
+  </div>`;
 }
 
 /* ---------------------------------------------------------------- Telegram */
@@ -827,38 +866,111 @@ async function compareBrains() {
 
 /* ---------------------------------------------------------------- 運行記錄 */
 
+const H = { kind: 'all', q: '', compare: false, selected: [] };
+
 async function loadRuns(silent) {
   try {
-    const r = await api('/api/v1/runs?limit=40');
+    const params = new URLSearchParams({ limit: '60' });
+    if (H.kind !== 'all') params.set('kind', H.kind);
+    if (H.q) params.set('q', H.q);
+    const r = await api('/api/v1/runs?' + params.toString());
     S.runs = r.items || [];
-    if (S.view === 'runs' || !silent) renderRuns(r.stats || {});
+    S.stats = r.stats || {};
+    if (S.view === 'runs') renderHistory();
   } catch (e) {
     if (!silent) toast(e.message, true);
   }
 }
 
-function renderRuns(stats) {
+function renderHistory() {
+  const st = S.stats || {};
   $('#runStats').innerHTML = `
-    <div class="stat"><div class="s-k">TOTAL RUNS</div><div class="s-v">${stats.total ?? S.runs.length}</div><div class="s-s">累計輸出</div></div>
-    <div class="stat"><div class="s-k">TODAY</div><div class="s-v">${stats.today ?? '—'}</div><div class="s-s">今日</div></div>
-    <div class="stat"><div class="s-k">AVG LATENCY</div><div class="s-v">${stats.avg_latency_ms ?? 0}<span style="font-size:11px;color:var(--tx-4)"> ms</span></div><div class="s-s">含上游取數</div></div>
-    <div class="stat"><div class="s-k">GUARD BLOCKED</div><div class="s-v ${stats.guard_blocked ? 'guard-block' : ''}">${stats.guard_blocked ?? 0}</div><div class="s-s">被護欄攔截</div></div>`;
+    <div class="stat"><div class="s-k">TOTAL</div><div class="s-v">${st.total ?? S.runs.length}</div><div class="s-s">累計輸出</div></div>
+    <div class="stat"><div class="s-k">TODAY</div><div class="s-v">${st.today ?? '—'}</div><div class="s-s">今日</div></div>
+    <div class="stat"><div class="s-k">AVG LATENCY</div><div class="s-v">${st.avg_latency_ms ?? 0}<span style="font-size:11px;color:var(--tx-4)"> ms</span></div><div class="s-s">平均</div></div>
+    <div class="stat"><div class="s-k">GUARD BLOCKED</div><div class="s-v ${st.guard_blocked ? 'guard-block' : ''}">${st.guard_blocked ?? 0}</div><div class="s-s">被護欄攔截</div></div>`;
 
-  const rows = S.runs.map((r, i) => `<tr class="row-click ${S.selectedRun === r.run_id ? 'is-sel' : ''}" data-run="${esc(r.run_id)}" data-i="${i}">
-      <td class="num">${esc((r.created_at || '').replace('T', ' ').slice(5, 16))}</td>
-      <td><span class="tag tag-flat">${r.kind === 'probe' ? '探針' : r.kind === 'answer' ? '追問' : '晨報'}</span></td>
-      <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.question || '—')}</td>
-      <td class="num">${esc(r.topology || '—')}</td>
-      <td class="num">${(r.confidence || 0).toFixed(2)}</td>
-      <td class="num">${r.latency_ms ?? '—'}ms</td>
-      <td class="num ${r.guard_passed ? 'guard-pass' : 'guard-block'}">${r.guard_passed ? 'PASS' : 'BLOCK'}</td>
-    </tr>`).join('');
+  const list = $('#historyList');
+  if (!list) return;
+  if (!S.runs.length) {
+    list.innerHTML = `<div class="empty"><div class="empty-mark">▤</div><h3>沒有符合條件的記錄</h3><p>先回晨報頁生成一份，或換個篩選。</p></div>`;
+    return;
+  }
+  const groups = {};
+  S.runs.forEach(r => {
+    const d = (r.created_at || '').slice(0, 10) || '未知日期';
+    (groups[d] = groups[d] || []).push(r);
+  });
+  list.innerHTML = Object.keys(groups).sort().reverse().map(date => `
+    <div class="tl-date"><span>${esc(date)}</span><em>${groups[date].length} 條</em></div>
+    ${groups[date].map(historyCard).join('')}`).join('');
 
-  $('#runsTable').innerHTML = `<table>
-      <thead><tr><th>時間</th><th>類型</th><th>輸入</th><th>拓撲</th><th>置信度</th><th>延遲</th><th>護欄</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" class="hint">還沒有記錄，先跑一次晨報。</td></tr>'}</tbody></table>`;
+  list.querySelectorAll('[data-open]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const row = S.runs.find(r => r.run_id === b.dataset.open);
+    if (row && row.kind === 'brief') loadStoredBrief(row.run_id);
+    else showRun(b.dataset.open);
+  });
+  list.querySelectorAll('[data-pick]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    togglePick(b.dataset.pick);
+  });
+}
 
-  $$('#runsTable tr[data-run]').forEach(tr => tr.onclick = () => showRun(tr.dataset.run));
+function historyCard(r) {
+  const kind = r.kind === 'probe' ? '探針' : r.kind === 'answer' ? '追問' : '晨報';
+  const picked = H.selected.includes(r.run_id);
+  const canPick = H.compare && r.kind === 'brief';
+  const title = r.headline || r.question || '（無輸入）';
+  return `<div class="tl-item ${picked ? 'is-pick' : ''}">
+    <div class="tl-time">${esc((r.created_at || '').slice(11, 16))}</div>
+    <div class="tl-card">
+      <div class="tl-top">
+        <span class="tag tag-flat">${kind}</span>
+        <span class="tag ${r.mode === 'llm' ? 'tag-a1' : 'tag-a2'}">${r.mode === 'llm' ? 'LLM' : '規則'}</span>
+        <span class="mono" style="font-size:10.5px;color:var(--tx-3)">置信 ${(r.confidence || 0).toFixed(2)}</span>
+        <span class="hint">${esc(r.topology || '')}</span>
+        <span class="hint" style="margin-left:auto">${r.latency_ms || 0}ms</span>
+        ${canPick ? `<button class="btn btn-ghost btn-sm" data-pick="${esc(r.run_id)}">${picked ? '已選' : '選'}</button>` : ''}
+        <button class="btn btn-ghost btn-sm" data-open="${esc(r.run_id)}">打開</button>
+      </div>
+      <div class="tl-title">${esc(title)}</div>
+      ${r.headline && r.question ? `<div class="tl-sub">問：${esc(r.question)}</div>` : ''}
+      <div class="tl-foot">${r.guard_passed ? '<span class="guard-pass">護欄通過</span>' : '<span class="guard-block">護欄攔截</span>'} · prompt ${esc(r.prompt_variant || '')}</div>
+    </div>
+  </div>`;
+}
+
+function togglePick(id) {
+  if (H.selected.includes(id)) H.selected = H.selected.filter(x => x !== id);
+  else {
+    H.selected.push(id);
+    if (H.selected.length > 2) H.selected.shift();
+  }
+  renderHistory();
+  renderCompareBox();
+}
+
+function renderCompareBox() {
+  const box = $('#compareBox');
+  if (!box) return;
+  if (!H.compare) { box.innerHTML = ''; return; }
+  if (H.selected.length < 2) {
+    box.innerHTML = `<div class="note-line info" style="margin-top:0">已選 ${H.selected.length} / 2 份：再選一份就能比較。</div>`;
+    return;
+  }
+  box.innerHTML = `<div class="note-line info" style="margin-top:0">正在比較兩份…</div>`;
+  compareTwo(H.selected[0], H.selected[1]);
+}
+
+async function compareTwo(a, b) {
+  const box = $('#compareBox');
+  try {
+    const d = await api('/api/v1/commander/compare?a=' + encodeURIComponent(a) + '&b=' + encodeURIComponent(b));
+    box.innerHTML = diffMarkup(d, true);
+  } catch (e) {
+    box.innerHTML = `<div class="note-line bad" style="margin-top:0">${esc(e.message)}</div>`;
+  }
 }
 
 async function showRun(runId) {
@@ -884,6 +996,10 @@ async function showRun(runId) {
         <div class="diff"><div class="d-k">分歧</div><div class="d-v">${(p.conflicts || []).length}</div></div>
       </div>
       <div id="replayOut" style="margin-top:12px"></div>
+      <details class="raw-box" style="margin-top:12px">
+        <summary>原始 payload（${esc(row.kind)}）</summary>
+        <pre class="raw-pre">${esc(JSON.stringify(p, null, 2))}</pre>
+      </details>
     </div>`;
     $('#btnReplay').onclick = () => replayRun(runId);
     const openBtn = $('#btnOpenRun');
@@ -917,6 +1033,70 @@ async function replayRun(runId) {
     loadRuns(true);
   } catch (e) {
     box.innerHTML = `<div class="note-line bad">${esc(e.message)}</div>`;
+  }
+}
+
+/* ---------------------------------------------------------------- 整合狀態 */
+
+async function loadIntegration(probe) {
+  try {
+    const d = await api('/api/v1/integration' + (probe ? '?probe=1' : ''));
+    S.integration = d;
+
+    const grid = $('#agentGrid');
+    if (grid) {
+      grid.innerHTML = (d.agents || []).map(a => {
+        const label = a.status === 'ok' ? '已接入' : a.status === 'offline' ? '未連線' : '未實作';
+        return `<div class="agent-card ${a.status}">
+          <div class="agent-top">
+            <span class="agent-id">${esc(a.id)}</span>
+            <span class="agent-role">${esc(a.role)}</span>
+            <span class="agent-status ${a.status}">${label}</span>
+          </div>
+          <div class="agent-name">${esc(a.name)}</div>
+          <div class="agent-owner">負責：${esc(a.owner)}</div>
+          <div class="agent-note">${esc(a.note)}</div>
+        </div>`;
+      }).join('');
+    }
+
+    const cl = $('#contractList');
+    if (cl) {
+      cl.innerHTML = (d.agents || []).filter(a => a.id !== 'A5').map(a => {
+        const st = a.status === 'ok' ? '✓ 已接通' : a.status === 'offline' ? '等連線' : '等實作';
+        return `<div class="contract-row ${a.status}">
+          <div class="cr-id">${esc(a.id)}</div>
+          <div class="cr-body">
+            <div class="cr-name">${esc(a.name)} · ${esc(a.owner)}</div>
+            <div class="cr-needs">${esc(a.needs)}</div>
+          </div>
+          <div class="cr-status">${st}</div>
+        </div>`;
+      }).join('');
+    }
+
+    const out = $('#probeOut');
+    if (!out) return;
+    if (probe && d.sample) {
+      const a1 = d.sample.a1, a2 = d.sample.a2;
+      out.innerHTML = `<div class="probe-grid-2">
+          <div>
+            <div class="probe-label">A1 ／api/v1/news/events</div>
+            <pre class="raw-pre small">${esc(JSON.stringify({ meta: a1.meta, first: (a1.items || [])[0] || null }, null, 2))}</pre>
+          </div>
+          <div>
+            <div class="probe-label">A2 ／api/v1/analyses</div>
+            <pre class="raw-pre small">${esc(JSON.stringify({ meta: a2.meta, first: (a2.items || [])[0] || null }, null, 2))}</pre>
+          </div>
+        </div>
+        <div class="note-line info" style="margin-top:10px">上面是上游的原始回應，不是 A5 整理過的。A5 只做適配，不改上游的資料。</div>`;
+      const hint = $('#probeHint');
+      if (hint) hint.textContent = '已重新檢測，' + new Date().toLocaleTimeString('zh-HK', { hour12: false });
+    } else {
+      out.innerHTML = '';
+    }
+  } catch (e) {
+    toast(e.message, true);
   }
 }
 
@@ -1003,6 +1183,33 @@ async function init() {
     doProbe(PROBE_SAMPLE.text, PROBE_SAMPLE.title, PROBE_SAMPLE.source, PROBE_SAMPLE.url);
   };
   $('#btnCompare').onclick = compareBrains;
+
+  // 歷史記錄：篩選 / 搜尋 / 比較模式
+  const hf = $('#histFilters');
+  if (hf) hf.addEventListener('click', e => {
+    const b = e.target.closest('[data-kind]');
+    if (!b) return;
+    H.kind = b.dataset.kind;
+    $$('#histFilters .chip').forEach(c => c.classList.toggle('is-on', c === b));
+    loadRuns();
+  });
+  let histTimer;
+  const hs = $('#histSearch');
+  if (hs) hs.addEventListener('input', e => {
+    clearTimeout(histTimer);
+    histTimer = setTimeout(() => { H.q = e.target.value.trim(); loadRuns(); }, 300);
+  });
+  const bc = $('#btnCompareMode');
+  if (bc) bc.onclick = () => {
+    H.compare = !H.compare;
+    H.selected = [];
+    bc.classList.toggle('btn-primary', H.compare);
+    bc.textContent = H.compare ? '退出比較' : '比較兩份';
+    renderHistory();
+    renderCompareBox();
+  };
+  const bp = $('#btnIntegProbe');
+  if (bp) bp.onclick = () => loadIntegration(true);
   const wlAdd = $('#btnWlAdd');
   if (wlAdd) {
     const addTerm = async () => {

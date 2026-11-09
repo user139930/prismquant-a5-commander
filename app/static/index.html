@@ -37,7 +37,10 @@
         <span class="nav-ico">⌬</span><span>大腦拓撲</span><em>BRAIN</em>
       </button>
       <button class="nav-item" data-view="runs">
-        <span class="nav-ico">▤</span><span>運行記錄</span><em>LEDGER</em>
+        <span class="nav-ico">▤</span><span>歷史記錄</span><em>HISTORY</em>
+      </button>
+      <button class="nav-item" data-view="integration">
+        <span class="nav-ico">⧉</span><span>整合狀態</span><em>WIRING</em>
       </button>
       <button class="nav-item" data-view="compliance">
         <span class="nav-ico">⛨</span><span>合規</span><em>GUARD</em>
@@ -52,7 +55,7 @@
     </div>
 
     <div class="rail-foot">
-      <span id="railVersion">v0.3.0</span>
+      <span id="railVersion">v0.4.0</span>
       <span class="dot-sep">·</span>
       <span id="railPrompt">prompt v1</span>
     </div>
@@ -184,17 +187,58 @@
       </div>
     </section>
 
-    <!-- ============ 運行記錄 ============ -->
+    <!-- ============ 歷史記錄 ============ -->
     <section class="view" id="view-runs">
       <div class="section-head">
-        <h2>每一次輸出都留檔</h2>
-        <p>proposal §3.4 要求「可重播這個決策」。這裡存的是輸入快照 + 當時的拓撲與提示詞版本，replay 是重跑再比對漂移，不是重播舊畫面。</p>
+        <h2>每一份晨報都留檔</h2>
+        <p>proposal §3.4 要求「可重播這個決策」。這裡存的是輸入快照、拓撲與提示詞版本；重播是重跑再比對漂移，不是重播舊畫面。任選兩份可以比較。</p>
       </div>
       <div class="stat-row" id="runStats"></div>
-      <div class="card">
-        <div class="table-wrap" id="runsTable"></div>
+
+      <div class="history-toolbar">
+        <div class="hist-filters" id="histFilters">
+          <button class="chip is-on" data-kind="all">全部</button>
+          <button class="chip" data-kind="brief">晨報</button>
+          <button class="chip" data-kind="probe">探針</button>
+          <button class="chip" data-kind="answer">追問</button>
+        </div>
+        <div class="hist-tools">
+          <input id="histSearch" class="input" placeholder="搜尋輸入內容…">
+          <button class="btn btn-ghost btn-sm" id="btnCompareMode">比較兩份</button>
+        </div>
       </div>
+      <div id="compareBox"></div>
+      <div id="historyList" class="history-list"></div>
       <div id="runDetail"></div>
+    </section>
+
+    <!-- ============ 整合狀態 ============ -->
+    <section class="view" id="view-integration">
+      <div class="section-head">
+        <h2>A5 已就位，四個代理還在路上</h2>
+        <p>這一頁是給隊友看的：A5 用到誰的資料、缺誰、各自要交什麼契約。缺的部分 A5 不用假數據填，而是留空並寫明等誰。</p>
+      </div>
+      <div class="agent-grid" id="agentGrid"></div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>連線自檢</h3>
+          <p>直接打 A1 / A2 的 health 與實際端點，看到的是真實回應，不是快取。</p>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" id="btnIntegProbe">重新檢測</button>
+          <span class="hint" id="probeHint">滑鼠移上去可以看原始回應</span>
+        </div>
+        <div id="probeOut"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>需要隊友交付的契約</h3>
+          <p>照這個格式做完，A5 只需要改一個環境變數就能接上，不用改程式。</p>
+        </div>
+        <div id="contractList" class="contract-list"></div>
+      </div>
     </section>
 
     <!-- ============ 合規 ============ -->

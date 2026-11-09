@@ -107,11 +107,21 @@ def save(payload: dict, snapshot: dict | None = None) -> str:
 
 def list_runs(limit: int = 30) -> list[dict]:
     with _db() as conn:
-        rows = conn.execute(
-            "SELECT run_id, created_at, kind, question, mode, topology, prompt_variant,"
-            " latency_ms, confidence, guard_passed FROM runs ORDER BY created_at DESC LIMIT ?",
-            (max(1, min(limit, 200)),),
-        ).fetchall()
+        try:
+            rows = conn.execute(
+                "SELECT run_id, created_at, kind, question, mode, topology, prompt_variant,"
+                " latency_ms, confidence, guard_passed,"
+                " json_extract(payload, '$.headline') AS headline"
+                " FROM runs ORDER BY created_at DESC LIMIT ?",
+                (max(1, min(limit, 200)),),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            rows = conn.execute(
+                "SELECT run_id, created_at, kind, question, mode, topology, prompt_variant,"
+                " latency_ms, confidence, guard_passed, NULL AS headline"
+                " FROM runs ORDER BY created_at DESC LIMIT ?",
+                (max(1, min(limit, 200)),),
+            ).fetchall()
     return [dict(r) for r in rows]
 
 

@@ -482,7 +482,6 @@ def scenarios(clusters: list[dict], conflicts: list[dict]) -> list[dict]:
 
     top = clusters[0] if clusters else None
     top_label = top["label"] if top else "宏觀情緒"
-    hedge = "維持現有風險預算，只在回調時分批處理" if conflicts else "按既有倉位節奏執行，不追價"
 
     return [
         {
@@ -502,12 +501,6 @@ def scenarios(clusters: list[dict], conflicts: list[dict]) -> list[dict]:
             "prob": p_bear,
             "path": "政策面轉鷹或事件升級，%s 的風險溢價擴大，高估值板塊先被殺估值。" % top_label,
             "triggers": ["A2 出現升級表態或正式限制文件", "油價／波動率同步上行"],
-        },
-        {
-            "name": "倉位含義",
-            "prob": None,
-            "path": hedge + "；A4 風控未接入，本頁不產生任何下單指令。",
-            "triggers": ["A4 上線後才允許把建議轉為意圖"],
         },
     ]
 

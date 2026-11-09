@@ -73,7 +73,8 @@ def a1_events(limit: int | None = None) -> tuple[list[dict], dict]:
         return [], meta
     events = data.get("events") or []
     meta.update({"count": len(events), "sampled": bool(data.get("sampled")),
-                 "agent": data.get("agent", "A1 新聞情報")})
+                 "agent": data.get("agent", "A1 新聞情報"),
+                 "empty": len(events) == 0})
     return events, meta
 
 
@@ -82,7 +83,8 @@ def a2_events(limit: int | None = None) -> tuple[list[dict], dict]:
     data, meta = _get(settings.a2_api_url, "/api/v1/analyses", {"limit": limit})
     if meta["ok"] and isinstance(data, dict) and data.get("events"):
         events = data["events"]
-        meta.update({"count": len(events), "degraded": False, "agent": data.get("agent", "A2 政要監控")})
+        meta.update({"count": len(events), "degraded": False,
+                     "agent": data.get("agent", "A2 政要監控"), "empty": len(events) == 0})
         return events, meta
 
     if meta.get("status") == "offline":

@@ -211,3 +211,55 @@ data: {"type":"result","payload":{…完整晨報…}}
 單價由 `PQ_PRICE_IN_PER_M` / `PQ_PRICE_OUT_PER_M` 決定（預設是 deepseek-chat 的量級）。
 實測一份晨報約 3,100 tokens、US$0.0011。200 個訂閱者每日一份約 US$0.22。
 這個數字寫進報告比「我們會控制成本」有用。
+
+---
+
+# v0.4 擴充：把「缺誰」變成產品的一部分
+
+## 13. 覆蓋範圍（coverage）
+
+`commander.coverage()` 把五個代理的狀態算進 payload：
+
+```json
+{"agents":[
+  {"id":"A1","name":"新聞情報","owner":"隊友","role":"感知","status":"offline","present":false,
+   "note":"未連線，本頁改用示例資料","needs":"多來源 RSS…"},
+  {"id":"A3","name":"執行代理","owner":"隊友","role":"決策","status":"missing","present":false,
+   "note":"未實作：本頁不產生任何標的建議","needs":"GET /api/v1/intents：…"},
+  {"id":"A5", "...":"本服務"}],
+ "missing":["A1","A2","A3","A4"],
+ "summary":"已接入：A5｜缺席：A1、A2、A3、A4"}
+```
+
+`present` 只有三種情況會是 true：A1/A2 在線且有資料、A5 本身。缺席不是靠 UI 隱藏，
+而是資料裡就帶著「缺什麼、等哪個端點」——這樣匯出 Markdown、Telegram 推送、甚至 API 呼叫者
+都會看到同一個事實。
+
+## 14. 離線 vs 在線但沒有資料
+
+這兩件事在上一版被混為一談，但處理方式完全不同：
+
+- **離線**（connect 失敗）：資料是「沒有」，用示例填充才不會讓 demo 空白，但必須標明。
+- **在線但空**（200 但 events=[]）：資料是「真的沒有」，用示例填充就是造假，必須留白。
+
+實作上 `connectors` 在 meta 裡加 `empty`，`commander.run()` 只對 `ok=false` 才切示例。
+測試 `test_online_but_empty_keeps_it_blank` 守住這條線。
+
+## 15. 歷史記錄與兩兩比較
+
+`GET /api/v1/runs?kind=&q=` 在 SQL 之後做篩選（`json_extract(payload,'$.headline')` 帶出主線句，
+失敗則回退成 NULL）。前端按 `created_at` 的日期分組渲染時間軸。
+
+比較有兩個入口，共用同一個 `_diff_payloads()`：
+
+- `GET /api/v1/commander/diff/{run_id}` — 與上一份比（晨報頁的差異卡）
+- `GET /api/v1/commander/compare?a=&b=` — 任選兩份（歷史記錄頁）
+
+差異只報四種：主題新增／掉出、方向翻轉、置信度變化（±0.03 以上）、證據 ID 增減。
+沒有變化時輸出「今天不需要改倉位」——這是決策語言，不是資料語言。
+
+## 16. 整合狀態頁
+
+`GET /api/v1/integration` 回傳五個代理的角色、負責人、狀態、以及 `needs`（要交的契約）。
+`?probe=1` 會真的去打 A1/A2 的端點，把**原始回應**貼在頁面上。
+這一頁的目的不是好看，是讓隊友在同一個畫面上看到「A5 已經好了、我在等你的這三個欄位」。
