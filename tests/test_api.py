@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 os.environ.setdefault("PQ_UPSTREAM_TIMEOUT", "0.8")
+os.environ.setdefault("PQ_LEDGER_PATH", "data/test_ledger.db")  # 測試不要污染示範用的歷史記錄
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
