@@ -30,7 +30,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import brains, commander, connectors, guardrails, ledger, store, telegram
+from app import brains, commander, connectors, guardrails, ledger, scheduler, store, telegram
 from app.config import settings
 
 STATIC = Path(__file__).parent / "static"
@@ -39,12 +39,16 @@ STATIC = Path(__file__).parent / "static"
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     ledger.init()
-    yield
+    scheduler.start()
+    try:
+        yield
+    finally:
+        await scheduler.stop()
 
 
 app = FastAPI(
     title=settings.service_name,
-    version="0.5.0",
+    version="0.6.0",
     description="PrismQuant A5 指揮官：A1 + A2 匯總、二次分析、大腦拓撲與合規護欄。",
     docs_url="/api/docs",
     redoc_url=None,
@@ -83,6 +87,10 @@ class CompareRequest(BaseModel):
 
 class WatchlistRequest(BaseModel):
     terms: list[str] = Field(default_factory=list)
+
+
+class GateRequest(BaseModel):
+    run_id: str
 
 
 class AskRequest(BaseModel):
@@ -253,6 +261,35 @@ def integration(probe: bool = False):
         "ledger": ledger.stats(),
         "sample_data_policy": "A1/A2 離線時整份改用內建示例；分析流程、大模型、合規檢查都是真實執行。",
     }
+
+
+@app.get("/api/v1/schedule")
+def schedule_status():
+    return scheduler.status()
+
+
+@app.post("/api/v1/schedule/run")
+async def schedule_run():
+    """手動觸發一次排程流程（生成 + 推送），用來驗證排程是否正常。"""
+    return await scheduler.fire("manual")
+
+
+@app.post("/api/v1/commander/gate")
+def gate(req: GateRequest):
+    """模擬 A4 風控閘門：把晨報的傳導鏈當成假設的執行意圖，跑一遍規則。
+
+    明確標記 simulated——A4 還沒有人做，這裡只是把「風控會怎麼否決」演出來，
+    不是真的下單，也不是真的風控。
+    """
+    row = ledger.get(req.run_id)
+    if row is None:
+        raise HTTPException(404, detail={"code": "run_not_found", "message": "找不到這份晨報"})
+    if row["kind"] != "brief":
+        raise HTTPException(422, detail={"code": "not_a_brief", "message": "只有晨報可以模擬風控"})
+    try:
+        return commander.simulate_gate(row["payload"])
+    except Exception as exc:
+        raise HTTPException(503, detail={"code": "gate_failed", "message": str(exc)[:300]})
 
 
 @app.get("/api/v1/commander/diff/{run_id}")

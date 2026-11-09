@@ -537,6 +537,97 @@ def probe(title: str, text: str, source: str = "", url: str = "") -> dict:
     return result
 
 
+# ---------------------------------------------------------------- A4 模擬閘門
+
+def simulate_gate(payload: dict) -> dict:
+    """把傳導鏈當成「假設的執行意圖」，跑一遍風控規則。
+
+    這是模擬，不是風控：A4 還沒有人實作。但它回答了一個真問題——
+    如果 A3 真的照這份晨報發單，風控會放行、減半、還是直接否決？
+    規則全部寫在這裡，可被逐條檢查，不呼叫大模型。
+    """
+    rows = (payload.get("transmission") or [])[:4]
+    conflicts = {c.get("topic") for c in payload.get("conflicts") or []}
+    single = set((payload.get("data_quality") or {}).get("single_source_topics") or [])
+    conf = (payload.get("confidence") or {}).get("score", 0) or 0
+
+    intents = []
+    total = 0.0
+    for t in rows:
+        label = t.get("from", "")
+        direction = t.get("direction")
+        strength = t.get("strength")
+        base = 10.0 if strength == "強" else (8.0 if strength == "中" else 5.0)
+        size = base
+        verdict = "pass"
+        reasons = []
+
+        if direction == "中性":
+            verdict, size = "reject", 0.0
+            reasons.append("方向中性：沒有可交易的方向，A4 不放行")
+        elif label in conflicts:
+            verdict, size = "reject", 0.0
+            reasons.append("A1／A2 在「%s」上仍分歧，等正式文件落地再談" % label)
+        else:
+            if label in single:
+                verdict = "degrade"
+                size = round(base * 0.5, 1)
+                reasons.append("單一來源：倉位減半，等第二個媒體確認")
+            if conf < 0.5:
+                verdict = "degrade"
+                size = min(size, 3.0)
+                reasons.append("晨報置信度 %.2f 低於 0.50：只允許觀察倉" % conf)
+            if not reasons:
+                reasons.append("方向明確、已交叉驗證、無未解分歧")
+
+        total += size
+        intents.append({
+            "instrument": (t.get("to") or ["—"])[0],
+            "label": label,
+            "direction": direction,
+            "size_pct": size,
+            "verdict": verdict,
+            "reasons": reasons,
+            "evidence": t.get("evidence", []),
+        })
+
+    scaled = False
+    if total > 30:
+        scale = 30.0 / total
+        for it in intents:
+            it["size_pct"] = round(it["size_pct"] * scale, 1)
+        total = 30.0
+        scaled = True
+
+    passed = sum(1 for i in intents if i["verdict"] == "pass")
+    degraded = sum(1 for i in intents if i["verdict"] == "degrade")
+    rejected = sum(1 for i in intents if i["verdict"] == "reject")
+
+    return {
+        "simulated": True,
+        "gate": "A4 mock",
+        "base_run_id": payload.get("run_id"),
+        "headline": payload.get("headline"),
+        "intents": intents,
+        "summary": {
+            "intents": len(intents),
+            "pass": passed,
+            "degrade": degraded,
+            "reject": rejected,
+            "notional_pct": round(total, 1),
+            "capped_at_30": scaled,
+        },
+        "rules": [
+            "方向中性 → reject",
+            "A1／A2 未解分歧 → reject",
+            "單一來源 → 倉位減半",
+            "晨報置信度 < 0.50 → 只允許觀察倉（≤3%）",
+            "同方向合計 > 30% → 按比例縮回 30%",
+        ],
+        "note": "模擬輸出：A4 未接入，這裡只示範風控會如何否決，不產生任何下單指令。",
+    }
+
+
 # ---------------------------------------------------------------- 五代理覆蓋範圍
 
 AGENT_META = {

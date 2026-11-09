@@ -356,7 +356,7 @@ td .sym{
 .scn-bar .bull{background:linear-gradient(90deg,#a8453a,#f4685c)}
 .scn-bar .base{background:linear-gradient(90deg,#2f4d70,#4a7fb5)}
 .scn-bar .bear{background:linear-gradient(90deg,#1b8a72,#2ec9a4)}
-.scn-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.scn-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;align-items:start}
 .scn-grid.three{grid-template-columns:repeat(3,1fr)}
 .scn-grid.two{grid-template-columns:repeat(2,1fr)}
 .scn{background:#0a0d12;border:1px solid var(--line);border-radius:11px;padding:13px 15px;display:flex;flex-direction:column;gap:7px}
@@ -710,4 +710,46 @@ td .sym{
   .cr-status{grid-column:2}
   .sec,.card{padding:16px}
   .chat-user,.chat-bot{max-width:100%}
+}
+
+/* ---------- A4 模擬閘門 ---------- */
+.gate-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.gate-row{background:#080c11;border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+.gr-top{display:flex;align-items:center;gap:8px}
+.gr-why{font-size:10.5px;color:var(--tx-4);line-height:1.6;margin-top:5px}
+.scn .btn{margin-top:2px}
+.sched-grid{margin-bottom:4px;grid-template-columns:repeat(4,1fr) !important}
+.sched-grid .usage-item{background:#080c11}
+
+/* ---------- 列印 / PDF ---------- */
+@media print{
+  @page{margin:14mm 12mm}
+  html,body{background:#fff !important;color:#111 !important;overflow:visible !important}
+  body::before{display:none !important}
+  .rail,.topbar,.foot,.hero-actions,.askbar,.chips,.status-grid,.coverage,.diff-card,
+  .ask-chips,.ask-row,.raw-box,.toast,.modal,.progress-card,.scn .btn,details{display:none !important}
+  .app{display:block !important;height:auto !important}
+  .main{overflow:visible !important}
+  .view{padding:0 !important;max-width:none !important}
+  .view:not(.is-active){display:none !important}
+  .brief-layout{display:block !important}
+  .brief-side{margin-top:8mm !important;display:grid !important;grid-template-columns:1fr 1fr !important;gap:6mm !important}
+  .hero{background:#fff !important;border:0 !important;border-bottom:1px solid #ddd !important;
+        border-radius:0 !important;padding:0 0 6mm !important;box-shadow:none !important}
+  .hero::before{display:none !important}
+  .hero h2,.hero-eyebrow{color:#111 !important}
+  .hero-eyebrow .live{display:none !important}
+  .sec,.side-card,.card{background:#fff !important;border:0 !important;border-top:1px solid #e3e3e3 !important;
+        border-radius:0 !important;box-shadow:none !important;padding:5mm 0 !important;break-inside:avoid}
+  .sec-head::after{background:#ddd !important}
+  .sec-num,.sec-head h3,.card-head h3,.card-head h2{color:#111 !important}
+  .sec-sub,.hint,.ev-sub,.gauge-level,.stat .s-s,.tl-foot{color:#666 !important}
+  .bullets li,.ev-title,.ev-title a,.diff-line,.scn p,.conflict-col .cc-txt{color:#222 !important}
+  .ev-row,.tl-card,.watch-card,.scn,.conflict,.gate-row,.diff{background:#fff !important;border:1px solid #e3e3e3 !important}
+  .tag,.ev-chip,.sym,.cov-chip{background:#f4f4f4 !important;color:#333 !important;border-color:#ddd !important}
+  .bar{background:#eee !important}
+  .conf-ring .bg,.gauge-ring .bg{stroke:#eee !important}
+  .conf-ring .fg,.gauge-ring .fg{stroke:#333 !important}
+  .meta-item{background:#f7f7f7 !important;color:#444 !important;border-color:#e3e3e3 !important}
+  a{color:#111 !important;text-decoration:none !important}
 }

@@ -126,5 +126,23 @@ class TestProbe(unittest.TestCase):
         self.assertEqual(r["topic"], "關稅與貿易")
 
 
+class TestScheduler(unittest.TestCase):
+    def test_next_run_is_future_and_same_clock(self):
+        from app import scheduler
+        import datetime as dt
+        now = dt.datetime(2026, 11, 10, 9, 0, tzinfo=scheduler.HK)
+        nxt = scheduler.next_run_at(now)
+        self.assertGreater(nxt, now)
+        self.assertEqual((nxt.hour, nxt.minute), (8, 30))
+        self.assertEqual(nxt.date(), dt.date(2026, 11, 11))
+
+    def test_next_run_today_when_before(self):
+        from app import scheduler
+        import datetime as dt
+        now = dt.datetime(2026, 11, 10, 6, 0, tzinfo=scheduler.HK)
+        nxt = scheduler.next_run_at(now)
+        self.assertEqual(nxt.date(), dt.date(2026, 11, 10))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

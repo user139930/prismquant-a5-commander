@@ -263,3 +263,51 @@ data: {"type":"result","payload":{…完整晨報…}}
 `GET /api/v1/integration` 回傳五個代理的角色、負責人、狀態、以及 `needs`（要交的契約）。
 `?probe=1` 會真的去打 A1/A2 的端點，把**原始回應**貼在頁面上。
 這一頁的目的不是好看，是讓隊友在同一個畫面上看到「A5 已經好了、我在等你的這三個欄位」。
+
+---
+
+# v0.6 擴充：會自己上班
+
+## 17. 定時晨報
+
+`app/scheduler.py`，asyncio 背景任務，在 FastAPI 的 lifespan 裡起停。
+
+```
+每 30 秒醒一次
+ ├─ 未啟用 → next_run=None，繼續睡
+ ├─ 算出下一個 HH:MM（今天或明天）
+ ├─ 距離 > 90 秒 → 分段睡（最多 5 分鐘），所以改 .env 不用重啟
+ └─ 到點 → await asyncio.to_thread(commander.run, question)
+           → telegram.send(build_message(payload))
+           → 睡 61 秒，避免同一分鐘重複觸發
+```
+
+三個刻意的決定：
+
+1. **走同一條 `commander.run()`**：排程不是另一條捷徑，護欄、留檔、降級、
+   示例資料標記全部一致。排程產出的晨報在歷史記錄裡跟手動生成的一模一樣。
+2. **狀態放在記憶體**（`STATE`）：last_run / next_run / fired / last_error。
+   重啟就清零——排程狀態不值得進資料庫，晨報本身已經在 ledger 了。
+3. **不引入排程框架**：一個 `asyncio.Task` 就夠，少一個依賴、少一個要顧的進程。
+
+`POST /api/v1/schedule/run` 給「立即執行一次」用，回傳 kind / run_id / delivery，
+UI 會 toast 出來，等於一個可驗證的排程測試。
+
+## 18. A4 模擬閘門
+
+`commander.simulate_gate(payload)`：把 `transmission` 前四條當成假設的執行意圖，
+套五條規則：
+
+| 規則 | 動作 |
+|---|---|
+| 方向中性 | reject |
+| 該主題在 `conflicts` 裡（A1/A2 未解） | reject |
+| 該主題是單一來源 | degrade，倉位減半 |
+| 晨報置信度 < 0.50 | degrade，上限 3%（觀察倉） |
+| 四條合計 > 30% | 全部按比例縮回 30% |
+
+回傳 `simulated: true`、`gate: "A4 mock"`、每條意圖的 `verdict / size_pct / reasons / evidence`，
+外加 `rules`（給人逐條檢查）與 `note`（「不產生任何下單指令」）。
+
+為什麼做成規則而不是讓模型判斷：風控必須可預測、可重播、可被審查。
+模型可以解釋規則，但不能決定放行。這跟 proposal §3.4「A4 只准規則」一致。

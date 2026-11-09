@@ -200,6 +200,37 @@ class TestApi(unittest.TestCase):
         self.assertEqual(body["kind"], "brief")
         self.assertIn("sections", body)
 
+    def test_gate_simulation(self):
+        run = self.client.post("/api/v1/commander/run", json={"question": "gate"}).json()
+        r = self.client.post("/api/v1/commander/gate", json={"run_id": run["run_id"]})
+        self.assertEqual(r.status_code, 200)
+        d = r.json()
+        self.assertTrue(d["simulated"])
+        self.assertEqual(d["gate"], "A4 mock")
+        self.assertGreaterEqual(len(d["intents"]), 1)
+        for it in d["intents"]:
+            self.assertIn(it["verdict"], ["pass", "degrade", "reject"])
+            self.assertGreaterEqual(it["size_pct"], 0)
+        self.assertLessEqual(d["summary"]["notional_pct"], 30.0)
+        # A4 未接入 → 一定是模擬，不能真的下單
+        self.assertIn("不產生任何下單指令", d["note"])
+
+    def test_gate_rejects_non_brief(self):
+        probe = self.client.post("/api/v1/commander/probe", json={"text": "央行加息"}).json()
+        r = self.client.post("/api/v1/commander/gate", json={"run_id": probe["run_id"]})
+        self.assertEqual(r.status_code, 422)
+
+    def test_gate_unknown_run(self):
+        r = self.client.post("/api/v1/commander/gate", json={"run_id": "r-nope"})
+        self.assertEqual(r.status_code, 404)
+
+    def test_schedule_status(self):
+        r = self.client.get("/api/v1/schedule")
+        self.assertEqual(r.status_code, 200)
+        d = r.json()
+        self.assertIn("enabled", d)
+        self.assertRegex(d["time"], r"^\d{2}:\d{2}$")
+
     def test_unknown_run(self):
         r = self.client.get("/api/v1/runs/r-nope")
         self.assertEqual(r.status_code, 404)

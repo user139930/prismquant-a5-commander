@@ -203,6 +203,7 @@ function renderBrief(p) {
       <div class="hero-actions">
         <button class="btn btn-ghost btn-sm" id="btnCopy">複製全文</button>
         <button class="btn btn-ghost btn-sm" id="btnMd">匯出 .md</button>
+        <button class="btn btn-ghost btn-sm" id="btnLink">複製連結</button>
         <button class="btn btn-ghost btn-sm" id="btnTg">Telegram 預覽</button>
         <button class="btn btn-ghost btn-sm" id="btnReplaySelf">重播</button>
       </div>
@@ -342,10 +343,11 @@ function renderBrief(p) {
                 <p>留空：需要 A4 回報 gate 狀態，A5 才能講倉位。A4 未接入，這段不生成。</p>
                 <div class="trig">等 A4 提供 /api/v1/risk/check</div>
               </div>
-              <div class="scn pos empty">
+              <div class="scn pos empty" id="gateCard">
                 <div class="scn-top"><span class="scn-name">執行意圖</span><span class="scn-prob">—</span></div>
                 <p>留空：A3 未實作。本頁不產生任何標的建議或下單意圖，只做研究輸出。</p>
                 <div class="trig">等 A3 提供 /api/v1/intents</div>
+                <button class="btn btn-ghost btn-sm" data-gate="${esc(p.run_id || '')}" style="align-self:flex-start;margin-top:10px">模擬 A4 審核</button>
               </div>
             </div>
           <div class="hint" style="margin-top:12px">情境權重由情緒分佈與交叉驗證強度加權得出，是可解釋的相對權重，不是價格預測。</div>`)}
@@ -386,6 +388,8 @@ function renderBrief(p) {
   $('#btnCopy').onclick = () => copyText(p.brief_text || '');
   const mdBtn = $('#btnMd');
   if (mdBtn) mdBtn.onclick = () => downloadText('prismquant-brief-' + (p.run_id || 'x') + '.md', briefMarkdown(p));
+  const linkBtn = $('#btnLink');
+  if (linkBtn) linkBtn.onclick = () => copyText(location.origin + '/#brief/' + (p.run_id || ''));
   $('#btnTg').onclick = () => openTelegram(p);
   $('#btnReplaySelf').onclick = () => replayRun(p.run_id);
   $$('#briefOut .chip[data-follow]').forEach(b => b.onclick = () => followUp(b.dataset.follow));
@@ -393,7 +397,40 @@ function renderBrief(p) {
   if (fi) fi.addEventListener('keydown', e => { if (e.key === 'Enter') followUp(fi.value); });
   const bf = $('#btnFollow');
   if (bf) bf.onclick = () => followUp($('#followInput').value);
+  $$('#briefOut [data-gate]').forEach(btn => btn.onclick = () => runGate(btn.dataset.gate, btn));
   loadDiff(p.run_id);
+}
+
+async function runGate(runId, btn) {
+  if (!runId) return toast('這份晨報沒有 run_id', true);
+  btn.disabled = true;
+  const old = btn.textContent;
+  btn.textContent = 'A4 審核中…';
+  try {
+    const d = await api('/api/v1/commander/gate', { method: 'POST', body: JSON.stringify({ run_id: runId }) });
+    const card = $('#gateCard');
+    if (!card) return;
+    const rows = (d.intents || []).map(it => {
+      const cls = it.verdict === 'pass' ? 'tag-down' : it.verdict === 'degrade' ? 'tag-up' : 'tag-flat';
+      const word = it.verdict === 'pass' ? '放行' : it.verdict === 'degrade' ? '減半' : '否決';
+      return `<div class="gate-row">
+        <div class="gr-top"><span class="sym">${esc(it.instrument)}</span>
+          <span class="tag ${cls}">${word}</span>
+          <span class="mono" style="margin-left:auto;font-size:10.5px;color:var(--tx-3)">${it.size_pct}%</span></div>
+        <div class="gr-why">${esc((it.reasons || []).join('；'))}</div>
+      </div>`;
+    }).join('');
+    card.innerHTML = `
+      <div class="scn-top"><span class="scn-name">A4 模擬審核</span><span class="scn-prob">${d.summary.notional_pct}%</span></div>
+      <div class="gate-list">${rows}</div>
+      <div class="trig">放行 ${d.summary.pass}｜減半 ${d.summary.degrade}｜否決 ${d.summary.reject}${d.summary.capped_at_30 ? '｜已按 30% 上限縮倉' : ''}</div>
+      <div class="hint" style="font-size:10px;margin-top:4px">${esc(d.note)}</div>`;
+    toast('A4 模擬完成（不是真的風控）');
+  } catch (e) {
+    toast(e.message, true);
+    btn.disabled = false;
+    btn.textContent = old;
+  }
 }
 
 function downloadText(filename, text) {
@@ -1163,6 +1200,8 @@ async function loadIntegration(probe) {
       }).join('');
     }
 
+    loadSchedule();
+
     const out = $('#probeOut');
     if (!out) return;
     if (probe && d.sample) {
@@ -1186,6 +1225,27 @@ async function loadIntegration(probe) {
   } catch (e) {
     toast(e.message, true);
   }
+}
+
+async function loadSchedule() {
+  const grid = $('#schedGrid');
+  if (!grid) return;
+  try {
+    const d = await api('/api/v1/schedule');
+    const item = (k, v) => `<div class="usage-item"><div class="u-k">${esc(k)}</div><div class="u-v" style="font-size:12px">${esc(v)}</div></div>`;
+    grid.innerHTML = [
+      item('狀態', d.enabled ? '已啟用' : '未啟用'),
+      item('每日時間', d.time),
+      item('下次執行', d.next_run ? d.next_run.slice(5, 16).replace('T', ' ') : '—'),
+      item('上次執行', d.last_run ? d.last_run.slice(5, 16).replace('T', ' ') : '—'),
+    ].join('');
+    const hint = $('#schedHint');
+    if (hint) {
+      hint.textContent = d.enabled
+        ? `已跑 ${d.fired} 次${d.last_error ? '；上次錯誤：' + d.last_error : ''}`
+        : '在 .env 設 PQ_SCHEDULE_ENABLED=true 就會每天自動跑（時間 PQ_SCHEDULE_TIME）';
+    }
+  } catch (e) { /* 靜默 */ }
 }
 
 /* ---------------------------------------------------------------- 合規 */
@@ -1309,6 +1369,19 @@ async function init() {
     bc.textContent = H.compare ? '退出比較' : '比較兩份';
     renderHistory();
     renderCompareBox();
+  };
+  const bs = $('#btnSchedRun');
+  if (bs) bs.onclick = async () => {
+    bs.disabled = true;
+    const t = bs.textContent;
+    bs.textContent = '執行中…';
+    try {
+      const r = await api('/api/v1/schedule/run', { method: 'POST' });
+      toast(r.ok ? '已生成並推送（' + (r.delivery || '') + '）' : '失敗：' + (r.error || ''), !r.ok);
+      loadSchedule();
+      loadRuns(true);
+    } catch (e) { toast(e.message, true); }
+    finally { bs.disabled = false; bs.textContent = t; }
   };
   const bp = $('#btnIntegProbe');
   if (bp) bp.onclick = () => loadIntegration(true);

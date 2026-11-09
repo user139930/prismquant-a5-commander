@@ -77,6 +77,11 @@ class Settings(BaseSettings):
         "監管", "地緣", "人民幣", "港股", "加密", "穩定幣",
     ]
 
+    # ---------- 定時晨報 ----------
+    schedule_enabled: bool = False
+    schedule_time: str = "08:30"
+    schedule_question: str = "生成今天的晨報"
+
     # ---------- 交付 ----------
     web_base_url: str = "http://127.0.0.1:8130"
 
