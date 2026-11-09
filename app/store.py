@@ -56,6 +56,63 @@ def set_watchlist(terms: list[str]) -> list[str]:
     return cleaned
 
 
+def mask_key(key: str) -> str:
+    if not key:
+        return ""
+    if len(key) <= 12:
+        return key[:3] + "***"
+    return key[:7] + "…" + key[-4:]
+
+
+def get_llm() -> dict:
+    """回傳介面要用的設定，永遠不帶完整 key。"""
+    with _lock:
+        llm = (_read().get("llm") or {})
+    key = str(llm.get("api_key") or settings.llm_api_key or "")
+    return {
+        "has_key": bool(key),
+        "key_masked": mask_key(key),
+        "base_url": str(llm.get("base_url") or settings.llm_base_url),
+        "model": str(llm.get("model") or settings.brain_shared_model),
+        "topology": settings.brain_topology,
+        "source": "ui" if llm.get("api_key") else ("env" if settings.llm_api_key else "none"),
+        "enabled": bool(key) and settings.brain_topology != "rule",
+    }
+
+
+def set_llm(api_key: str | None = None, base_url: str | None = None,
+            model: str | None = None) -> dict:
+    """存到本機 prefs 並立即生效（不用重啟）。"""
+    with _lock:
+        data = _read()
+        llm = data.get("llm") if isinstance(data.get("llm"), dict) else {}
+        if api_key is not None:
+            key = api_key.strip()
+            if key:
+                llm["api_key"] = key
+            else:
+                llm.pop("api_key", None)
+        if base_url is not None and base_url.strip():
+            llm["base_url"] = base_url.strip().rstrip("/")
+        if model is not None and model.strip():
+            llm["model"] = model.strip()
+        data["llm"] = llm
+        _write(data)
+
+    if llm.get("api_key"):
+        settings.llm_api_key = llm["api_key"]
+    elif api_key is not None:
+        settings.llm_api_key = ""
+    if llm.get("base_url"):
+        settings.llm_base_url = llm["base_url"]
+    if llm.get("model"):
+        settings.brain_shared_model = llm["model"]
+        settings.brain_a5_model = llm["model"]
+        settings.brain_a1_model = llm["model"]
+        settings.brain_a2_model = llm["model"]
+    return get_llm()
+
+
 def reset_watchlist() -> list[str]:
     with _lock:
         data = _read()

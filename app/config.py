@@ -92,6 +92,7 @@ class Settings(BaseSettings):
 
     # ---------- 儲存 ----------
     ledger_path: str = "data/a5_ledger.db"
+    prefs_path: str = "data/prefs.json"   # 使用者設定（關注詞、大模型 key），已被 gitignore
     brief_target_max_minutes: int = 10
 
     @field_validator("brain_topology")
@@ -111,5 +112,39 @@ class Settings(BaseSettings):
         p = Path(self.ledger_path)
         return p if p.is_absolute() else PROJECT_ROOT / p
 
+    @property
+    def prefs_file(self) -> Path:
+        p = Path(self.prefs_path)
+        return p if p.is_absolute() else PROJECT_ROOT / p
+
 
 settings = Settings()
+
+
+def _apply_saved_llm() -> None:
+    """啟動時套用介面上存過的大模型設定。
+
+    放在 config 而不是 store，是為了避免循環 import；而且要在 import 期就生效，
+    這樣測試後續覆寫 settings 仍然優先（測試因此保持離線）。
+    """
+    import json
+
+    try:
+        data = json.loads(settings.prefs_file.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    llm = data.get("llm") if isinstance(data, dict) else None
+    if not isinstance(llm, dict):
+        return
+    if llm.get("api_key"):
+        settings.llm_api_key = str(llm["api_key"])
+    if llm.get("base_url"):
+        settings.llm_base_url = str(llm["base_url"])
+    if llm.get("model"):
+        settings.brain_shared_model = str(llm["model"])
+        settings.brain_a5_model = str(llm["model"])
+        settings.brain_a1_model = str(llm["model"])
+        settings.brain_a2_model = str(llm["model"])
+
+
+_apply_saved_llm()

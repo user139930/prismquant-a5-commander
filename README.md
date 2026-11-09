@@ -6,7 +6,7 @@
 **A5 不是摘要器。** 摘要器回答「發生了什麼」，A5 要回答「這意味著什麼、我該盯什麼、
 什麼情況下我錯了」。這三件事分別由 L0 正規化、L1 交叉驗證、L2 情境推演實現。
 
-- 版本：v0.6.0　提示詞：`v1`　預設大腦：`lens`　實測：一份 LLM 晨報約 20 秒、約 US$0.001
+- 版本：v0.7.0　提示詞：`v1`　預設大腦：`lens`　實測：一份 LLM 晨報約 20 秒、約 US$0.001
 - 依賴：FastAPI + httpx + SQLite（全部標準庫或輕量套件，`pip install` 一次搞定）
 - **不需要大模型 key、不需要 A1/A2 在線，也能完整示範**（規則引擎 + 示例資料，頁面會標示）
 
@@ -19,6 +19,16 @@
 - **關注詞可在介面上改**（存在 `data/prefs.json`），改完下一次生成生效。
 - 每次 run 顯示 tokens 與估算成本；一鍵匯出 Markdown。
 - 歷史晨報可深連結：`/#brief/<run_id>`（Telegram 推送的連結直接打開那一份）。
+
+**v0.7.0：key 可以在介面上填，每人用自己的**
+
+不需要改 `.env`、不需要碰命令行：大腦拓撲頁最下面有「大模型連線」，貼 key → 測試 → 儲存。
+
+- 存在本機 `data/prefs.json`（已 gitignore），**介面只回傳遮罩後的字串**（`sk-or-v…3f18`），
+  前端拿不到完整 key，截圖或分享畫面都不會漏。
+- 存完**即時生效**，不用重啟；重啟時 `config` 會自動載入。
+- 「測試連線」會真的打一次 20 token 的請求，回報模型與延遲。
+- 沒有 key 的晨報多一行提示：「到大腦拓撲貼上自己的 key →」。
 
 **v0.6.0：它會自己上班了**
 
@@ -218,6 +228,8 @@ copy .env.example .env                             # 可選，不設也能跑
 | GET | `/api/v1/runs?kind=&q=` | 歷史記錄（可篩類型與關鍵字） |
 | GET / POST | `/api/v1/schedule` ・ `/run` | 定時晨報狀態 / 立即執行一次 |
 | POST | `/api/v1/commander/gate` | 對某份晨報模擬 A4 風控審核（simulated） |
+| GET / PUT | `/api/v1/settings/llm` | 讀寫大模型設定（回傳永遠遮罩） |
+| POST | `/api/v1/settings/llm/test` | 用目前的 key 真打一次，回報延遲 |
 | POST | `/api/v1/commander/probe` | `{"title":"","text":"…","source":"","url":""}` → 單篇分析 |
 | GET | `/api/v1/runs?limit=30` | 運行記錄 |
 | GET | `/api/v1/runs/{run_id}` | 單次詳情（含輸入快照） |

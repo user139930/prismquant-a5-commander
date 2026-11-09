@@ -10,6 +10,7 @@ from pathlib import Path
 
 os.environ.setdefault("PQ_UPSTREAM_TIMEOUT", "0.8")
 os.environ.setdefault("PQ_LEDGER_PATH", "data/test_ledger.db")  # 測試不要污染示範用的歷史記錄
+os.environ.setdefault("PQ_PREFS_PATH", "data/test_prefs.json")  # 也不要覆寫使用者存過的 key
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -230,6 +231,34 @@ class TestApi(unittest.TestCase):
         d = r.json()
         self.assertIn("enabled", d)
         self.assertRegex(d["time"], r"^\d{2}:\d{2}$")
+
+    def test_llm_settings_roundtrip(self):
+        from app.config import settings as cfg
+        before = cfg.llm_api_key
+        try:
+            r = self.client.get("/api/v1/settings/llm")
+            self.assertEqual(r.status_code, 200)
+            self.assertFalse(r.json()["has_key"])          # 測試環境沒有 key
+
+            put = self.client.put("/api/v1/settings/llm",
+                                  json={"api_key": "sk-or-v1-testtesttesttest", "model": "deepseek/deepseek-chat"})
+            d = put.json()
+            self.assertTrue(d["has_key"])
+            self.assertEqual(d["source"], "ui")
+            self.assertNotIn("testtesttesttest", d["key_masked"])   # 不准回傳完整 key
+            self.assertTrue(d["key_masked"].endswith("test"))
+            self.assertIn("…", d["key_masked"])
+            self.assertEqual(cfg.llm_api_key, "sk-or-v1-testtesttesttest")
+
+            cleared = self.client.put("/api/v1/settings/llm", json={"api_key": ""}).json()
+            self.assertFalse(cleared["has_key"])
+        finally:
+            cfg.llm_api_key = before
+            self.client.put("/api/v1/settings/llm", json={"api_key": ""})
+
+    def test_llm_test_endpoint_without_key(self):
+        r = self.client.post("/api/v1/settings/llm/test")
+        self.assertEqual(r.status_code, 400)
 
     def test_unknown_run(self):
         r = self.client.get("/api/v1/runs/r-nope")

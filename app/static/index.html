@@ -55,7 +55,7 @@
     </div>
 
     <div class="rail-foot">
-      <span id="railVersion">v0.6.0</span>
+      <span id="railVersion">v0.7.0</span>
       <span class="dot-sep">·</span>
       <span id="railPrompt">prompt v1</span>
     </div>
@@ -172,6 +172,30 @@
         </div>
         <div id="cmpOut"></div>
       </div>
+      <div class="card">
+        <div class="card-head">
+          <h3>大模型連線</h3>
+          <p>貼上你自己的 OpenRouter key。存在本機 <span class="mono">data/prefs.json</span>，不上傳、不進 git；介面只顯示遮罩後的字串。</p>
+        </div>
+        <div class="field-row">
+          <label class="field"><span>API Key</span>
+            <input id="llmKey" class="input" type="password" placeholder="sk-or-v1-…" autocomplete="off">
+          </label>
+          <label class="field"><span>模型</span>
+            <input id="llmModel" class="input" placeholder="deepseek/deepseek-chat">
+          </label>
+        </div>
+        <label class="field"><span>Base URL</span>
+          <input id="llmBase" class="input" placeholder="https://openrouter.ai/api/v1">
+        </label>
+        <div class="form-actions">
+          <button class="btn btn-primary" id="btnSaveKey">儲存</button>
+          <button class="btn btn-ghost" id="btnTestKey">測試連線</button>
+          <button class="btn btn-ghost" id="btnClearKey">清除</button>
+          <span class="hint" id="llmHint">檢查中…</span>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <h3>關注詞</h3>

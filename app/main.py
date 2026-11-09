@@ -48,7 +48,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.service_name,
-    version="0.6.0",
+    version="0.7.0",
     description="PrismQuant A5 指揮官：A1 + A2 匯總、二次分析、大腦拓撲與合規護欄。",
     docs_url="/api/docs",
     redoc_url=None,
@@ -87,6 +87,12 @@ class CompareRequest(BaseModel):
 
 class WatchlistRequest(BaseModel):
     terms: list[str] = Field(default_factory=list)
+
+
+class LlmSettingsRequest(BaseModel):
+    api_key: str | None = None
+    base_url: str | None = None
+    model: str | None = None
 
 
 class GateRequest(BaseModel):
@@ -433,6 +439,36 @@ def brain_compare(req: CompareRequest):
 
 
 # ---------------------------------------------------------------- 合規 / Telegram
+
+@app.get("/api/v1/settings/llm")
+def get_llm_settings():
+    return store.get_llm()
+
+
+@app.put("/api/v1/settings/llm")
+def put_llm_settings(req: LlmSettingsRequest):
+    """在介面上貼 key：存本機 data/prefs.json，即時生效，不用重啟。
+
+    回傳永遠是遮罩過的 key——前端拿不到完整字串，截圖或分享畫面都不會漏。
+    """
+    return store.set_llm(req.api_key, req.base_url, req.model)
+
+
+@app.post("/api/v1/settings/llm/test")
+def test_llm_settings():
+    if not settings.llm_api_key:
+        raise HTTPException(400, detail={"code": "no_key", "message": "還沒設定 key"})
+    if settings.brain_topology == "rule":
+        raise HTTPException(400, detail={"code": "rule_mode",
+                                         "message": "目前拓撲是 rule，不會呼叫大模型；先切成 lens"})
+    role = brains.plan().role("a5")
+    try:
+        out, meta = brains.chat_json("只輸出 JSON。", '回 {"ok":true}', role, max_tokens=20)
+        return {"ok": True, "model": role.model, "latency_ms": meta.get("latency_ms"),
+                "reply": out}
+    except brains.LLMError as exc:
+        raise HTTPException(502, detail={"code": "llm_failed", "message": str(exc)[:200]})
+
 
 @app.get("/api/v1/watchlist")
 def get_watchlist():

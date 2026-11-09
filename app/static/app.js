@@ -183,7 +183,10 @@ function renderBrief(p) {
   const notes = [];
 
   if (p.source_note) notes.push(`<div class="note-line bad">⚠ ${esc(p.source_note)}</div>`);
-  if (brain.degraded) notes.push(`<div class="note-line">↯ ${esc(brain.degrade_reason || '已降級')}</div>`);
+  if (brain.degraded) {
+    const hintText = (brain.degrade_reason || '已降級');
+    notes.push(`<div class="note-line">↯ ${esc(hintText)}　<a href="#brain" style="white-space:nowrap">到大腦拓撲貼上自己的 key →</a></div>`);
+  }
   if (q.sample_mode && !p.source_note) notes.push(`<div class="note-line">ℹ 上游標記為示例資料，本頁不可用作真實決策。</div>`);
 
   const hero = `<div class="hero">
@@ -931,6 +934,7 @@ function renderBrain() {
     <div class="rec-tradeoff">取捨：${esc(rec.trade_off || '')}</div>`;
 
   loadWatchlist();
+  loadLlm();
 
   const btn = $('#btnCompare');
   if (!d.llm_enabled) {
@@ -1248,6 +1252,62 @@ async function loadSchedule() {
   } catch (e) { /* 靜默 */ }
 }
 
+/* ---------------------------------------------------------------- 大模型連線 */
+
+async function loadLlm() {
+  try {
+    const d = await api('/api/v1/settings/llm');
+    $('#llmModel').value = d.model || '';
+    $('#llmBase').value = d.base_url || '';
+    $('#llmKey').value = '';
+    $('#llmKey').placeholder = d.has_key ? '已設定：' + d.key_masked + '（留空不改）' : 'sk-or-v1-…';
+    const src = d.source === 'env' ? '來自 .env' : d.source === 'ui' ? '介面設定' : '未設定';
+    $('#llmHint').textContent = d.has_key
+      ? `目前：${d.key_masked}（${src}）${d.enabled ? '' : '　·　拓撲是 rule，不會呼叫模型'}`
+      : '尚未設定 key：會走規則引擎，功能完整但文字較生硬';
+  } catch (e) { /* 靜默 */ }
+}
+
+async function saveLlm(clear) {
+  const key = $('#llmKey').value.trim();
+  const body = { model: $('#llmModel').value.trim(), base_url: $('#llmBase').value.trim() };
+  if (clear) body.api_key = '';
+  else if (key) body.api_key = key;
+  try {
+    const d = await api('/api/v1/settings/llm', { method: 'PUT', body: JSON.stringify(body) });
+    $('#llmKey').value = '';
+    await loadLlm();
+    await refreshMeta();
+    toast(d.has_key ? (clear ? '已清除 key' : '已儲存，立即生效') : '已清除 key');
+  } catch (e) { toast(e.message, true); }
+}
+
+async function testLlm() {
+  const btn = $('#btnTestKey');
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '測試中…';
+  try {
+    const r = await api('/api/v1/settings/llm/test', { method: 'POST' });
+    toast('連線正常：' + r.model + '（' + r.latency_ms + 'ms）');
+  } catch (e) {
+    toast('連線失敗：' + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
+  }
+}
+
+async function refreshMeta() {
+  try {
+    const meta = await api('/api/v1/meta');
+    S.meta = meta;
+    $('#badgeBrain').textContent = (meta.brain || '').toUpperCase();
+    $('#railVersion').textContent = 'v' + meta.version;
+    $('#railPrompt').textContent = 'prompt ' + meta.prompt_variant;
+  } catch (e) { /* 靜默 */ }
+}
+
 /* ---------------------------------------------------------------- 合規 */
 
 async function loadCompliance() {
@@ -1370,6 +1430,13 @@ async function init() {
     renderHistory();
     renderCompareBox();
   };
+  const bk = $('#btnSaveKey');
+  if (bk) bk.onclick = () => saveLlm(false);
+  const btk = $('#btnTestKey');
+  if (btk) btk.onclick = testLlm;
+  const bck = $('#btnClearKey');
+  if (bck) bck.onclick = () => saveLlm(true);
+
   const bs = $('#btnSchedRun');
   if (bs) bs.onclick = async () => {
     bs.disabled = true;
