@@ -6,7 +6,7 @@
 **A5 不是摘要器。** 摘要器回答「發生了什麼」，A5 要回答「這意味著什麼、我該盯什麼、
 什麼情況下我錯了」。這三件事分別由 L0 正規化、L1 交叉驗證、L2 情境推演實現。
 
-- 版本：v0.4.0　提示詞：`v1`　預設大腦：`lens`　實測：一份 LLM 晨報約 20 秒、約 US$0.001
+- 版本：v0.4.1　提示詞：`v1`　預設大腦：`lens`　實測：一份 LLM 晨報約 20 秒、約 US$0.001
 - 依賴：FastAPI + httpx + SQLite（全部標準庫或輕量套件，`pip install` 一次搞定）
 - **不需要大模型 key、不需要 A1/A2 在線，也能完整示範**（規則引擎 + 示例資料，頁面會標示）
 
@@ -19,6 +19,20 @@
 - **關注詞可在介面上改**（存在 `data/prefs.json`），改完下一次生成生效。
 - 每次 run 顯示 tokens 與估算成本；一鍵匯出 Markdown。
 - 歷史晨報可深連結：`/#brief/<run_id>`（Telegram 推送的連結直接打開那一份）。
+
+**v0.4.1：輸入框先判斷你在說什麼**
+
+之前那個框看起來像對話，但不管你打什麼都生成一份晨報——你打 `hello`，它回一份晨報，這叫答非所問。
+現在 `commander.run()` 先做意圖識別：
+
+| 你說 | 它做什麼 |
+|---|---|
+| `hello` / `你好` / `早晨` | 回一句招呼 + 目前上游狀態 + 最近一份晨報，附四個下一步按鈕 |
+| `你能做什麼` / `help` | 說明四項能力與限制（A3/A4 缺席） |
+| `test` / `測試` | 回報系統狀態（LLM、A1、A2、閘門） |
+| 其他任何話 | 生成晨報（行為不變） |
+
+招呼這條路不呼叫大模型，280ms 內回，零成本。`?ask=hello` 可以直接預填並送出（示範／截圖用）。
 
 **v0.4 新增（把「我只負責 A5」講清楚）**
 
@@ -150,7 +164,7 @@ copy .env.example .env                             # 可選，不設也能跑
 | GET | `/api/v1/meta` | 版本、拓撲、提示詞、端點清單 |
 | GET | `/api/v1/upstream/health` | A1 / A2 / A4 / A5 狀態 |
 | GET | `/api/v1/commander/stream` | SSE 版晨報：逐步推送進度，最後送完整 payload |
-| POST | `/api/v1/commander/run` | `{"question":"…","topology":"lens"}` → 晨報 |
+| POST | `/api/v1/commander/run` | `{"question":"…","topology":"lens"}` → 晨報，或 `kind:"chat"`（招呼／功能／測試） |
 | POST | `/api/v1/commander/ask` | `{"run_id":"…","question":"…"}` → 對該份晨報追問 |
 | GET | `/api/v1/commander/diff/{run_id}` | 與上一份晨報的差異 |
 | GET / PUT | `/api/v1/watchlist` | 讀寫關注詞（`POST /reset` 還原預設） |

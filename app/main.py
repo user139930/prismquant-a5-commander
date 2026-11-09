@@ -44,7 +44,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.service_name,
-    version="0.4.0",
+    version="0.4.1",
     description="PrismQuant A5 指揮官：A1 + A2 匯總、二次分析、大腦拓撲與合規護欄。",
     docs_url="/api/docs",
     redoc_url=None,
@@ -439,16 +439,23 @@ def telegram_render(req: RenderRequest):
     return {"message": telegram.build_message(req.payload)}
 
 
+def _delivery_text(payload: dict) -> str:
+    """對話型 payload 沒有晨報結構，直接送 reply。"""
+    if payload.get("kind") == "chat":
+        return "%s\n\n%s" % (payload.get("reply", ""), payload.get("context", ""))
+    return telegram.build_message(payload)
+
+
 @app.post("/api/v1/telegram/preview")
 def telegram_preview(req: RunRequest):
     payload = commander.run(req.question, req.topology)
-    return {"message": telegram.build_message(payload), "run": payload}
+    return {"message": _delivery_text(payload), "run": payload}
 
 
 @app.post("/api/v1/telegram/send")
 def telegram_send(req: RunRequest):
     payload = commander.run(req.question, req.topology)
-    result = telegram.send(telegram.build_message(payload))
+    result = telegram.send(_delivery_text(payload))
     return {"delivery": result, "run_id": payload.get("run_id")}
 
 

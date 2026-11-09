@@ -44,7 +44,7 @@ class TestApi(unittest.TestCase):
         self.assertIn("prompts", body)
 
     def test_run_rule_mode(self):
-        r = self.client.post("/api/v1/commander/run", json={"question": "測試", "topology": "rule"})
+        r = self.client.post("/api/v1/commander/run", json={"question": "生成今天的晨報", "topology": "rule"})
         self.assertEqual(r.status_code, 200)
         body = r.json()
         self.assertEqual(body["kind"], "brief")
@@ -173,6 +173,32 @@ class TestApi(unittest.TestCase):
         body = r.json()
         self.assertEqual(len(body["agents"]), 5)
         self.assertIn("sample_data_policy", body)
+
+    def test_greeting_returns_chat_not_brief(self):
+        r = self.client.post("/api/v1/commander/run", json={"question": "hello"})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["kind"], "chat")
+        self.assertEqual(body["intent"], "greeting")
+        self.assertIn("A5", body["reply"])
+        self.assertNotIn("sections", body)          # 不該生成晨報
+        self.assertTrue(body["suggestions"])
+
+    def test_help_intent(self):
+        body = self.client.post("/api/v1/commander/run", json={"question": "你能做什麼"}).json()
+        self.assertEqual(body["kind"], "chat")
+        self.assertEqual(body["intent"], "help")
+
+    def test_test_intent_reports_status(self):
+        body = self.client.post("/api/v1/commander/run", json={"question": "測試"}).json()
+        self.assertEqual(body["intent"], "test")
+        self.assertIn("advisory_only", body["reply"])
+
+    def test_real_question_still_makes_brief(self):
+        body = self.client.post("/api/v1/commander/run",
+                                json={"question": "今天該留意什麼風險？", "topology": "rule"}).json()
+        self.assertEqual(body["kind"], "brief")
+        self.assertIn("sections", body)
 
     def test_unknown_run(self):
         r = self.client.get("/api/v1/runs/r-nope")

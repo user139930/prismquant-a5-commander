@@ -152,7 +152,7 @@ function renderStatus(payload) {
     tile('A1 新聞', s1, c1) +
     tile('A2 政要', s2, c2) +
     tile('A4 風控', '未接入', 'warn') +
-    tile('大腦', brain ? (brain.mode === 'llm' ? 'LLM · ' + brain.label : '規則 · ' + brain.label) : '—', brain && brain.degraded ? 'warn' : 'ok');
+    tile('大腦', brain ? (brain.mode === 'llm' ? 'LLM · ' + brain.label : '規則 · ' + brain.label) : '待命', brain && brain.degraded ? 'warn' : 'ok');
 
   if (payload && payload.source_note) {
     // 只顯示一次提示，放在 status 之後
@@ -510,7 +510,8 @@ async function runBrief(question) {
         if (ev.type === 'progress') pushProgress(ev);
         else if (ev.type === 'result') {
           clearInterval(timer);
-          renderBrief(ev.payload);
+          if (ev.payload && ev.payload.kind === 'chat') renderChat(ev.payload);
+          else renderBrief(ev.payload);
           loadRuns(true);
         } else if (ev.type === 'error') {
           throw new Error(ev.message || '生成失敗');
@@ -525,6 +526,41 @@ async function runBrief(question) {
     S.busy = false;
     setBusy(btn, false);
   }
+}
+
+/* ---------------------------------------------------------------- 對話（不是晨報） */
+
+function renderChat(p) {
+  S.brief = null;
+  const out = $('#briefOut');
+  out.innerHTML = `<div class="chat-card">
+    <div class="cc-head">
+      <span class="tag tag-a1">A5 指揮官</span>
+      <span class="hint">${esc((p.generated_at || '').slice(11, 16))}　·　${esc(p.intent === 'greeting' ? '打招呼' : p.intent === 'help' ? '功能說明' : '系統檢查')}</span>
+    </div>
+    <div class="cc-body">${esc(p.reply)}</div>
+    ${p.context ? `<div class="cc-ctx">${esc(p.context)}</div>` : ''}
+    <div class="cc-sug">
+      ${(p.suggestions || []).map(x => `<button class="chip" data-sug="${esc(x)}">${esc(x)}</button>`).join('')}
+    </div>
+  </div>`;
+  $$('#briefOut [data-sug]').forEach(b => b.onclick = () => {
+    const v = b.dataset.sug;
+    if (v === '看最近一份晨報') return openLatestBrief();
+    if (v === '分析一篇新聞') { switchView('probe'); return; }
+    $('#q').value = v;
+    runBrief(v);
+  });
+  $('#footRun').textContent = 'chat ' + (p.run_id || '');
+}
+
+async function openLatestBrief() {
+  try {
+    const r = await api('/api/v1/runs?kind=brief&limit=1');
+    const row = (r.items || [])[0];
+    if (!row) return toast('還沒有晨報，先生成一份', true);
+    loadStoredBrief(row.run_id);
+  } catch (e) { toast(e.message, true); }
 }
 
 /* ---------------------------------------------------------------- 追問 */
@@ -918,7 +954,7 @@ function renderHistory() {
 }
 
 function historyCard(r) {
-  const kind = r.kind === 'probe' ? '探針' : r.kind === 'answer' ? '追問' : '晨報';
+  const kind = r.kind === 'probe' ? '探針' : r.kind === 'answer' ? '追問' : r.kind === 'chat' ? '對話' : '晨報';
   const picked = H.selected.includes(r.run_id);
   const canPick = H.compare && r.kind === 'brief';
   const title = r.headline || r.question || '（無輸入）';
@@ -988,7 +1024,7 @@ async function showRun(runId) {
         <button class="btn btn-ghost btn-sm" id="btnOpenRun" style="margin-left:auto">打開這份</button>
         <button class="btn btn-ghost btn-sm" id="btnReplay">重播並比對漂移</button>
       </div>
-      <div class="hint" style="margin-bottom:10px">${esc(p.headline || (p.input || {}).title || '')}</div>
+      <div class="hint" style="margin-bottom:10px">${esc(p.headline || (p.input || {}).title || p.question || p.reply || '')}</div>
       <div class="diff-grid">
         <div class="diff"><div class="d-k">置信度</div><div class="d-v">${(conf.score || 0).toFixed(2)}</div></div>
         <div class="diff"><div class="d-k">模式</div><div class="d-v" style="font-size:12px">${esc((p.brain || {}).mode || '—')}</div></div>
@@ -1244,6 +1280,7 @@ async function init() {
     $('#badgeBrain').textContent = (meta.brain || '').toUpperCase();
     $('#badgeGate').textContent = meta.a4_gate === 'advisory_only' ? 'A4 未接入 · 只有建議權' : 'A4 已接入';
     renderRail(health);
+    renderStatus({ upstream: { a1: health.a1, a2: health.a2 }, data_quality: {}, brain: null });
     if (!meta.llm_enabled) $('#badgeBrain').title = '未設定 API key，使用規則引擎';
   } catch (e) {
     toast('服務未就緒：' + e.message, true);
@@ -1251,6 +1288,14 @@ async function init() {
 
   await loadRuns(true);
   await loadBrain();
+
+  // ?ask=hello 可直接預填並送出（示範、截圖、或分享一個問題用）
+  const pre = new URLSearchParams(location.search).get('ask');
+  if (pre) {
+    $('#q').value = pre;
+    runBrief(pre);
+    return;
+  }
 
   const hash = (location.hash || '#brief').replace('#', '');
   if (hash.startsWith('brief/')) {

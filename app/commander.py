@@ -134,6 +134,95 @@ def _citations(text: str) -> int:
     return len(re.findall(r"\b[NP]\d{1,2}\b", text or ""))
 
 
+# ---------------------------------------------------------------- 意圖識別
+
+GREETINGS = {
+    "hello", "hi", "hey", "yo", "hihi", "hiya", "good morning", "morning",
+    "你好", "妳好", "您好", "哈囉", "哈罗", "嗨", "在嗎", "在吗", "有人嗎",
+    "早晨", "早上好", "午安", "安安", "師傅", "大佬",
+}
+HELP_WORDS = {
+    "help", "你能做什麼", "你能做什么", "你會什麼", "你会什么", "怎麼用", "怎么用",
+    "功能", "介紹一下", "介绍一下", "用法", "說明", "说明", "可以問什麼", "可以问什么",
+}
+TEST_WORDS = {"test", "testing", "測試", "测试", "ping", "1", "123", "？", "?", "在不在"}
+
+
+def classify_intent(text: str) -> str:
+    """判斷使用者這句話是「打招呼 / 問功能 / 測系統」還是「要晨報」。
+
+    為什麼要有這層：A5 是唯一面向使用者的入口，輸入框長得像對話框。
+    使用者打 hello，期待的是回一句話，不是被塞一份晨報——那就是答非所問。
+    """
+    raw = (text or "").strip().lower()
+    if not raw:
+        return "brief"
+    core = raw.strip("!！?？。.,，~～ ")
+    if core in GREETINGS or raw in GREETINGS:
+        return "greeting"
+    if core in TEST_WORDS:
+        return "test"
+    for w in HELP_WORDS:
+        if w in raw:
+            return "help"
+    return "brief"
+
+
+def _last_brief() -> dict | None:
+    for row in ledger.list_runs(12):
+        if row.get("kind") == "brief":
+            return row
+    return None
+
+
+def chat_payload(question: str, intent: str) -> dict:
+    """不是要晨報時的回覆。不呼叫大模型：招呼和功能說明應該秒回、零成本。"""
+    now = _now_iso()[11:16]
+    last = _last_brief()
+    upstream = connectors.health()
+    a1 = "已連線" if upstream["a1"].get("ok") else "未連線"
+    a2 = "已連線" if upstream["a2"].get("ok") else "未連線"
+
+    if intent == "greeting":
+        reply = "你好，我是 A5 指揮官。\n\n我負責把 A1 新聞與 A2 政要的結果匯總成一份晨報，" \
+                "做交叉驗證、標出分歧、給出可解釋的置信度，並在合規護欄下交付。"
+    elif intent == "help":
+        reply = (
+            "我能做四件事：\n"
+            "1. 生成晨報：匯總 A1／A2，做二次分析與情境推演\n"
+            "2. 單篇探針：貼一段新聞，出傳導鏈與受影響標的\n"
+            "3. 追問：對某一份晨報繼續問，答案必須帶證據 ID\n"
+            "4. 比較：任選兩份晨報，看主題與方向變了什麼\n\n"
+            "限制：A3 執行與 A4 風控還沒接入，所以我只給研究輸出，不產生下單指令。"
+        )
+    else:  # test
+        llm = "已啟用（%s）" % settings.brain_shared_model if settings.llm_enabled else "未設定 key，走規則引擎"
+        reply = "系統正常。大模型：%s；A1 %s、A2 %s；風控閘門 advisory_only。" % (llm, a1, a2)
+
+    tail = "現在 %s（香港時間）。A1 %s、A2 %s。" % (now, a1, a2)
+    if last:
+        tail += "最近一份晨報是 %s，置信度 %.2f。" % (
+            (last.get("created_at") or "")[11:16], last.get("confidence") or 0)
+
+    return {
+        "kind": "chat",
+        "intent": intent,
+        "question": question,
+        "reply": reply,
+        "context": tail,
+        "suggestions": ["生成今天的晨報", "看最近一份晨報", "你能做什麼？", "分析一篇新聞"],
+        "brain": {"topology": "rule", "label": "對話（規則）", "mode": "rule",
+                  "prompt_variant": settings.prompt_variant, "models": {},
+                  "degraded": False, "degrade_reason": ""},
+        "guard": {"passed": True, "blocked": [], "broken_evidence": [],
+                  "a4_gate": "advisory_only", "a4_connected": False, "advisory": True,
+                  "note": "A4 風控未接入：A5 只有建議權。"},
+        "disclaimer": "PrismQuant 為研究與決策輔助工具，不構成投資建議。",
+        "stats": {"latency_ms": 0, "tokens": 0},
+        "generated_at": _now_iso(),
+    }
+
+
 # ---------------------------------------------------------------- 主流程
 
 def run(question: str = "", topology: str | None = None, progress=None) -> dict:
@@ -144,6 +233,15 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
         if progress:
             progress({"stage": stage, "message": message,
                       "elapsed_ms": int((time.time() - started) * 1000), **extra})
+
+    intent = classify_intent(q)
+    if intent != "brief":
+        # 打招呼／問功能／測系統：直接回話，不要塞一份晨報給人
+        payload = chat_payload(q, intent)
+        payload["run_id"] = ledger.new_id("c")
+        ledger.save(payload, snapshot={"question": q, "intent": intent})
+        emit("done", "已回覆（%s）" % intent, run_id=payload["run_id"])
+        return payload
 
     emit("upstream", "呼叫 A1 新聞與 A2 政要監控")
     (a1, a1_meta), (a2, a2_meta) = connectors.fetch_all()

@@ -606,3 +606,14 @@ td .sym{font-family:var(--mono);font-size:11px;color:#cfe0f4;background:#0f1926;
   .hero,.sec,.card,.coverage{min-width:0}
   .cov-row{min-width:0}
 }
+
+/* ---------- 對話回覆卡 ---------- */
+.chat-card{
+  background:linear-gradient(180deg,#0e1826,#0b1119);border:1px solid #22384f;
+  border-radius:12px;padding:16px 18px;position:relative;
+}
+.chat-card::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:2px;border-radius:2px;background:linear-gradient(180deg,#5b9cf8,#a78bfa)}
+.cc-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.cc-body{font-size:13px;color:#dbe7f5;line-height:1.85;white-space:pre-wrap;padding-left:10px}
+.cc-ctx{margin-top:12px;padding:9px 11px;background:#0a1119;border:1px solid var(--line);border-radius:8px;font-size:11.5px;color:var(--tx-3);line-height:1.7}
+.cc-sug{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px;padding-left:10px}
