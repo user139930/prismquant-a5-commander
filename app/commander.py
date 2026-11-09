@@ -78,7 +78,8 @@ def _facts(payload: dict) -> str:
     conf = payload.get("confidence") or {}
     quality = payload.get("data_quality") or {}
     return {
-        "question": payload.get("question") or "生成今天的晨報",
+        "question": (payload.get("question") or "生成今天的晨報")
+                    + ("｜使用者關注：" + payload["focus"] if payload.get("focus") else ""),
         "clusters": clusters,
         "evidence": evidence,
         "conflicts": conflicts,
@@ -142,8 +143,10 @@ GREETINGS = {
     "早晨", "早上好", "午安", "安安", "師傅", "大佬",
 }
 HELP_WORDS = {
-    "help", "你能做什麼", "你能做什么", "你會什麼", "你会什么", "怎麼用", "怎么用",
-    "功能", "介紹一下", "介绍一下", "用法", "說明", "说明", "可以問什麼", "可以问什么",
+    "help", "你能做什麼", "你能做什么", "你可以做什麼", "你可以做什么",
+    "你會做什麼", "你会做什么", "你會什麼", "你会什么", "有什麼功能", "有什么功能",
+    "怎麼用", "怎么用", "功能", "介紹一下", "介绍一下", "介紹自己", "介绍自己",
+    "你是誰", "你是谁", "用法", "說明", "说明", "可以問什麼", "可以问什么",
 }
 TEST_WORDS = {"test", "testing", "測試", "测试", "ping", "1", "123", "？", "?", "在不在"}
 
@@ -175,15 +178,27 @@ def _last_brief() -> dict | None:
     return None
 
 
-def chat_payload(question: str, intent: str) -> dict:
+def status_context(upstream: dict) -> str:
+    """給模型的事實：連線狀態與時間。不讓它自己猜。"""
+    a1 = "已連線" if upstream["a1"].get("ok") else "未連線"
+    a2 = "已連線" if upstream["a2"].get("ok") else "未連線"
+    return ("【系統狀態，事實】現在 %s（香港時間）；A1 新聞 %s；A2 政要 %s；"
+            "A3 執行 未實作；A4 風控 未接入（本服務只有建議權）。"
+            % (_now_iso()[11:16], a1, a2))
+
+
+def chat_payload(question: str, intent: str, reply: str | None = None,
+                 upstream: dict | None = None) -> dict:
     """不是要晨報時的回覆。不呼叫大模型：招呼和功能說明應該秒回、零成本。"""
     now = _now_iso()[11:16]
     last = _last_brief()
-    upstream = connectors.health()
+    upstream = upstream or connectors.health()
     a1 = "已連線" if upstream["a1"].get("ok") else "未連線"
     a2 = "已連線" if upstream["a2"].get("ok") else "未連線"
 
-    if intent == "greeting":
+    if reply:
+        pass
+    elif intent == "greeting":
         reply = "你好，我是 A5 指揮官。\n\n我負責把 A1 新聞與 A2 政要的結果匯總成一份晨報，" \
                 "做交叉驗證、標出分歧、給出可解釋的置信度，並在合規護欄下交付。"
     elif intent == "help":
@@ -234,14 +249,36 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
             progress({"stage": stage, "message": message,
                       "elapsed_ms": int((time.time() - started) * 1000), **extra})
 
-    intent = classify_intent(q)
-    if intent != "brief":
-        # 打招呼／問功能／測系統：直接回話，不要塞一份晨報給人
-        payload = chat_payload(q, intent)
-        payload["run_id"] = ledger.new_id("c")
-        ledger.save(payload, snapshot={"question": q, "intent": intent})
-        emit("done", "已回覆（%s）" % intent, run_id=payload["run_id"])
-        return payload
+    # 先讓模型自己判斷；沒有 key 或失敗才退回關鍵詞規則
+    emit("think", "判斷你想做什麼")
+    upstream = connectors.health()
+    routed = None if q == "生成今天的晨報" else brains.route(q, status_context(upstream))
+    focus = ""
+
+    if routed:
+        emit("think", "判斷完成：%s" % ("要晨報" if routed["intent"] == "brief" else "先回話"),
+             done=True)
+        if routed["intent"] == "chat":
+            payload = chat_payload(q, "chat", reply=routed["reply"], upstream=upstream)
+            payload["brain"].update({"mode": "llm", "label": "對話（LLM）",
+                                     "llm_meta": routed.get("meta") or {}})
+            payload["stats"]["tokens"] = ((routed.get("meta") or {}).get("completion_tokens") or 0)
+            payload["stats"]["latency_ms"] = int((time.time() - started) * 1000)
+            payload["run_id"] = ledger.new_id("c")
+            ledger.save(payload, snapshot={"question": q, "intent": "chat", "route": routed})
+            emit("done", "已回覆", run_id=payload["run_id"])
+            return payload
+        focus = routed.get("focus") or ""
+    else:
+        intent = classify_intent(q)
+        emit("think", "無大模型，用規則判斷：%s" % intent, done=True)
+        if intent != "brief":
+            payload = chat_payload(q, intent, upstream=upstream)
+            payload["stats"]["latency_ms"] = int((time.time() - started) * 1000)
+            payload["run_id"] = ledger.new_id("c")
+            ledger.save(payload, snapshot={"question": q, "intent": intent})
+            emit("done", "已回覆（%s）" % intent, run_id=payload["run_id"])
+            return payload
 
     emit("upstream", "呼叫 A1 新聞與 A2 政要監控")
     (a1, a1_meta), (a2, a2_meta) = connectors.fetch_all()
@@ -274,7 +311,9 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
         "note": source_note,
     }
 
-    payload = analyze.build_brief(q, a1, a2, sample_mode, store.get_watchlist(), upstream_meta)
+    payload = analyze.build_brief(q, a1, a2, sample_mode, store.get_watchlist(),
+                                  upstream_meta, focus=focus)
+    payload["focus"] = focus
     emit("analyze",
          "L0 正規化 → L1 交叉驗證（%d 個主題 / %d 組分歧）→ L2 情境推演" % (
              len(payload.get("clusters", [])), len(payload.get("conflicts", []))),

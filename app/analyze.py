@@ -640,7 +640,7 @@ def reading_minutes(sections: dict, brief: str = "") -> float:
 # ---------------------------------------------------------------- 主入口：晨報
 
 def build_brief(question: str, a1_events, a2_events, sample_mode: bool,
-                watchlist: list[str], upstream_meta: dict) -> dict:
+                watchlist: list[str], upstream_meta: dict, focus: str = "") -> dict:
     a1 = normalize_a1(a1_events)
     a2 = normalize_a2(a2_events)
     atoms = a1 + a2
@@ -648,6 +648,10 @@ def build_brief(question: str, a1_events, a2_events, sample_mode: bool,
 
     quality = data_quality(atoms, sample_mode)
     clusters = cluster(atoms)
+    if focus:
+        # 使用者問「今天港股怎樣」時，把港股相關主題排到最前，主線句才會對得上問題
+        fk, _ = classify(focus)
+        clusters.sort(key=lambda c: 0 if c["topic_key"] == fk else 1)
     conflicts = detect_conflicts(clusters)
     watch_terms = [t for t in (watchlist or []) if any(t.lower() in _as_text(a["title"], a["summary"]) for a in atoms)]
 

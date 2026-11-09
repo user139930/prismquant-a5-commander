@@ -429,6 +429,7 @@ async function copyText(text) {
 }
 
 const STAGES = [
+  ['think', '判斷意圖'],
   ['upstream', '取上游'],
   ['analyze', '規則層分析'],
   ['llm', '大模型改寫'],
@@ -536,7 +537,7 @@ function renderChat(p) {
   out.innerHTML = `<div class="chat-card">
     <div class="cc-head">
       <span class="tag tag-a1">A5 指揮官</span>
-      <span class="hint">${esc((p.generated_at || '').slice(11, 16))}　·　${esc(p.intent === 'greeting' ? '打招呼' : p.intent === 'help' ? '功能說明' : '系統檢查')}</span>
+      <span class="hint">${esc((p.generated_at || '').slice(11, 16))}　·　${esc({ greeting: '打招呼', help: '功能說明', test: '系統檢查', chat: '回覆' }[p.intent] || '回覆')}</span>
     </div>
     <div class="cc-body">${esc(p.reply)}</div>
     ${p.context ? `<div class="cc-ctx">${esc(p.context)}</div>` : ''}

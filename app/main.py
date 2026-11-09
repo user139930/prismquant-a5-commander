@@ -44,7 +44,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.service_name,
-    version="0.4.1",
+    version="0.4.2",
     description="PrismQuant A5 指揮官：A1 + A2 匯總、二次分析、大腦拓撲與合規護欄。",
     docs_url="/api/docs",
     redoc_url=None,

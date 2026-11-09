@@ -189,6 +189,41 @@ def _parse_json(text: str):
         raise LLMError("JSON 解析失敗：%s" % exc)
 
 
+# ---------------------------------------------------------------- 意圖路由
+
+def route(message: str, context: str = "", role: Role | None = None) -> dict | None:
+    """讓模型自己判斷使用者想幹什麼。
+
+    為什麼不寫死關鍵詞：中文的說法無窮無盡（「你能做什麼」「你可以做什麼」「你識做咩」），
+    規則永遠漏。這裡只做一件事——問模型；模型答不了（沒 key、超時、JSON 壞）就回 None，
+    由呼叫方退回關鍵詞規則。
+    """
+    if not settings.llm_api_key or settings.brain_topology == "rule":
+        return None
+    system = load_prompt("router_system")
+    if not system:
+        return None
+    if role is None:
+        base = plan().role("a5")
+        # 路由用 T=0：同一個問法要拿到同一個判斷，不要忽長忽短
+        role = Role("router", base.model, 0.0, base.lens)
+    user = (context + "\n\n" if context else "") + "使用者說：" + (message or "").strip()
+    try:
+        out, meta = chat_json(system, user, role, max_tokens=600)
+    except LLMError:
+        return None
+    if not isinstance(out, dict):
+        return None
+    intent = str(out.get("intent") or "").strip().lower()
+    if intent not in {"brief", "chat"}:
+        return None
+    reply = str(out.get("reply") or "").strip()
+    if intent == "chat" and len(reply) < 2:
+        return None
+    return {"intent": intent, "reply": reply,
+            "focus": str(out.get("focus") or "").strip(), "meta": meta}
+
+
 # ---------------------------------------------------------------- 提示詞
 
 def load_prompt(name: str) -> str:
