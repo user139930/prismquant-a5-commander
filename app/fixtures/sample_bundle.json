@@ -1,0 +1,138 @@
+{
+  "_note": "內建示例資料（DEMO DATA）。不是真實新聞，只用於 A1 / A2 未啟動時的離線示範。時間用 ago_hours 表示，載入時換算成真實時間戳，避免示範畫面出現陳年舊聞。",
+  "a1": {
+    "agent": "A1 新聞情報",
+    "sampled": true,
+    "events": [
+      {
+        "title": "美聯儲官員：通脹若持續回落，年內仍有降息空間",
+        "summary": "多位官員在公開場合表示，若核心通脹延續下行，年內仍有一次降息空間，但強調一切取決於數據。",
+        "sentiment": "利多",
+        "topics": ["利率", "貨幣政策"],
+        "instruments": ["US10Y", "NDX", "DXY"],
+        "confidence": 0.82,
+        "source": "Reuters",
+        "url": "https://www.reuters.com/markets/rates-bond/example-fed-officials",
+        "ago_hours": 2.5
+      },
+      {
+        "title": "美國擬擴大先進芯片設備出口限制，涉及 12 家供應商",
+        "summary": "草案把部分先進封裝與量測設備納入清單，業界預計對東亞供應鏈形成直接影響。",
+        "sentiment": "利空",
+        "topics": ["半導體", "出口限制"],
+        "instruments": ["SOX", "NVDA", "TSM"],
+        "confidence": 0.76,
+        "source": "Bloomberg",
+        "url": "https://www.bloomberg.com/news/articles/example-chip-export-curbs",
+        "ago_hours": 3.2
+      },
+      {
+        "title": "台積電上調全年資本開支指引至 420 億美元",
+        "summary": "管理層稱 AI 服務器需求強於預期，先進製程產能利用率維持高位。",
+        "sentiment": "利多",
+        "topics": ["半導體", "資本開支"],
+        "instruments": ["TSM", "SOX"],
+        "confidence": 0.71,
+        "source": "Reuters",
+        "url": "https://www.reuters.com/technology/example-tsmc-capex",
+        "ago_hours": 4.1
+      },
+      {
+        "title": "歐佩克+ 推遲增產決定，油價升至兩週高位",
+        "summary": "產油國把增產評估推遲到下次會議，市場解讀為供給端維持偏緊。",
+        "sentiment": "利多",
+        "topics": ["能源", "原油"],
+        "instruments": ["CL", "XLE"],
+        "confidence": 0.68,
+        "source": "財新",
+        "url": "https://www.caixin.com/example-opec-delay",
+        "ago_hours": 5.4
+      },
+      {
+        "title": "內地推出新一輪消費品以舊換新補貼",
+        "summary": "覆蓋家電與汽車，總規模約 800 億元人民幣，實施細則下月落地。",
+        "sentiment": "利多",
+        "topics": ["港股", "政策"],
+        "instruments": ["HSI", "9988.HK"],
+        "confidence": 0.64,
+        "source": "新華社",
+        "url": "https://www.news.cn/example-consumer-subsidy",
+        "ago_hours": 6.8
+      },
+      {
+        "title": "監管機構就穩定幣儲備披露規則徵求意見",
+        "summary": "要求發行方按季披露儲備構成與託管機構，為期 60 天諮詢。",
+        "sentiment": "中性",
+        "topics": ["加密", "監管"],
+        "instruments": ["BTC", "COIN"],
+        "confidence": 0.58,
+        "source": "Bloomberg",
+        "url": "https://www.bloomberg.com/news/articles/example-stablecoin-rules",
+        "ago_hours": 8.2
+      },
+      {
+        "title": "日本央行官員暗示正常化步伐可能快於市場預期",
+        "summary": "措辭由「耐心」轉為「視數據調整」，日圓短線走強，套息交易出現平倉。",
+        "sentiment": "利空",
+        "topics": ["外匯", "利率"],
+        "instruments": ["USDJPY", "DXY"],
+        "confidence": 0.61,
+        "source": "Reuters",
+        "url": "https://www.reuters.com/markets/asia/example-boj-normalisation",
+        "ago_hours": 9.5
+      },
+      {
+        "title": "中東航運保險費率上升，部分航線改道",
+        "summary": "戰爭險保費一週內上升約三成，繞行令航程延長、運費跟漲。",
+        "sentiment": "利空",
+        "topics": ["地緣", "航運"],
+        "instruments": ["BDI", "CL", "VIX"],
+        "confidence": 0.55,
+        "source": "BBC",
+        "url": "https://www.bbc.com/news/business-example-shipping-insurance",
+        "ago_hours": 14.0
+      }
+    ]
+  },
+  "a2": {
+    "agent": "A2 政要監控",
+    "events": [
+      {
+        "title": "貿易代表：將重新評估關鍵行業關稅，不排除提高稅率",
+        "summary": "在聽證會上表示，若談判無進展，將對關鍵行業重新評估關稅水平。",
+        "direction": "利空",
+        "entities": ["USTR", "半導體", "汽車"],
+        "markets": ["美股", "港股"],
+        "confidence": 0.70,
+        "ago_hours": 1.5
+      },
+      {
+        "title": "央行官員：通脹回落趨勢確立前不會急於放鬆",
+        "summary": "強調政策需要看到連續數據，市場對年內降息的定價偏樂觀。",
+        "direction": "利空",
+        "entities": ["央行", "FOMC"],
+        "markets": ["美股", "外匯"],
+        "confidence": 0.66,
+        "ago_hours": 2.2
+      },
+      {
+        "title": "財政部：金融科技監管指引將於下季展開諮詢",
+        "summary": "覆蓋支付、放貸與數據治理三個範疇，暫不涉及牌照數量上限。",
+        "direction": "中性",
+        "entities": ["財政部", "金融科技"],
+        "markets": ["港股"],
+        "confidence": 0.60,
+        "ago_hours": 11.0
+      },
+      {
+        "title": "能源部長：不排除釋放戰略儲備以平抑油價",
+        "summary": "表示若油價持續上行，會在必要時與盟友協調釋放儲備。",
+        "direction": "利空",
+        "entities": ["能源部", "戰略儲備"],
+        "markets": ["原油"],
+        "confidence": 0.63,
+        "ago_hours": 4.5
+      }
+    ]
+  }
+}

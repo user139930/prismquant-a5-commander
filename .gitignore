@@ -1,17 +1,20 @@
-# 密鑰與本機設定
-.env
-.env.local
-.env.*.local
-.env.*
-!.env.example
-
-# 執行期
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 .venv/
 venv/
+*.egg-info/
 
-# IDE
-.idea/
+# 環境與密鑰
+.env
+
+# 執行時資料（run ledger 不進版控）
+data/
+*.sqlite3
+*.db
+
+# 工具
 .vscode/
-*.swp
+.idea/
+.DS_Store
+Thumbs.db

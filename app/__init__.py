@@ -1,2 +1,4 @@
 # -*- coding: utf-8 -*-
-"""PrismQuant A5 指揮官智能體（Commander Agent）。"""
+"""PrismQuant A5 Commander Agent（指揮官智能體）。"""
+
+__version__ = "0.2.0"

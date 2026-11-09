@@ -1,41 +1,206 @@
 # PrismQuant A5 指揮官智能體（Commander Agent）
 
-唯一的用戶入口：呼叫 A1 新聞與 A2 政要監控，把兩邊結論**匯總、調解分歧**，
-產出一份 10 分鐘讀得完的**晨報＋證據鏈**。A3 執行、A4 風控接入後，再擴充它的匯總範圍。
+> 唯一的用戶入口：把 A1 新聞情報與 A2 政要監控匯總成一份**決策級晨報**，
+> 做交叉驗證、調解分歧、推演情境，並在合規護欄下交付到 Web 與 Telegram。
 
-## 技術棧
+**A5 不是摘要器。** 摘要器回答「發生了什麼」，A5 要回答「這意味著什麼、我該盯什麼、
+什麼情況下我錯了」。這三件事分別由 L0 正規化、L1 交叉驗證、L2 情境推演實現。
 
-- FastAPI（無狀態，不存資料庫）
-- 用 `httpx` 呼叫上游 A1 / A2 的 HTTP 接口
-- 大模型：OpenRouter（OpenAI 相容介面）
+- 版本：v0.2.0　提示詞：`v1`　預設大腦：`lens`
+- 依賴：FastAPI + httpx + SQLite（全部標準庫或輕量套件，`pip install` 一次搞定）
+- **不需要大模型 key、不需要 A1/A2 在線，也能完整示範**（規則引擎 + 示例資料，頁面會標示）
 
-## 快速開始
+---
+
+## 1. 職責邊界
+
+| 做 | 不做 |
+|---|---|
+| 匯總 A1 / A2，補上來源、時間、可追溯 ID | 不抓新聞、不寫 RSS 適配器（那是 A1） |
+| 交叉驗證：同一件事有幾個獨立媒體在講 | 不做爬蟲（那是 A2 的下一版） |
+| 調解 A1 與 A2 的方向衝突，兩邊都列出 | 不下單、不託管資金（那是 A3 / A4） |
+| 給出可解釋的置信度（每一分加減都列出） | 不預測價格、不給「必漲」 |
+| 交付：Web 控制台 + Telegram 推送與指令 | 不繞過 A4 風控閘門 |
+
+對應 proposal：F-07（Commander dialogue）、Table 3（A5 職責）、§3.2 控制流、§3.4 Run 與 replay。
+
+---
+
+## 2. 三層二次分析
+
+```
+A1 新聞 ─┐
+         ├─▶ L0 正規化 ─▶ L1 交叉驗證 ─▶ L2 情境推演 ─▶ 護欄 ─▶ 晨報 + 證據鏈
+A2 政要 ─┘   （對齊 schema）  （數獨立來源、抓衝突）  （三情境 + 觸發/作廢條件）
+```
+
+- **L0 正規化**：A1 與 A2 的 schema 不同（`sentiment` vs `direction`、`published` vs `published_at`），
+  先攤平成同一種 atom，並補上 `publisher`。A1 目前只寫 `source="RSS"`，A5 會從 URL 反推媒體名
+  （BBC / Reuters / Bloomberg / 財新…），否則「來源太少」這個問題在介面上看不出來。
+- **L1 交叉驗證**：按主題聚類，數「幾個獨立媒體」講同一件事。單一來源的主題會被標記並扣分；
+  A1 與 A2 方向相反時產生分歧卡，並寫明**裁決規則**與**作廢條件**。
+- **L2 情境推演**：由情緒分佈與驗證強度加權出基準／偏多／偏空三種路徑，附可驗證的觸發點。
+  權重是可解釋的相對權重，不是價格預測。
+
+置信度不是模型自評，是加減分規則：媒體數、A2 是否在線、衝突數、單源數、時效、示例資料上限。
+每一項都列在頁面上（「置信度」卡），可以直接被 examiner 追問。
+
+---
+
+## 3. 同一個大腦，還是不同大腦？
+
+四種拓撲都能跑，`PQ_BRAIN_TOPOLOGY` 一個環境變數切換，介面「大腦拓撲」頁也可以即時對照。
+
+| 拓撲 | 做法 | 什麼時候用 |
+|---|---|---|
+| `rule` | 不呼叫大模型 | 離線、降級、回歸測試（本專案預設降級路徑） |
+| `shared` | 所有角色同一個模型、同一個溫度 | 打通鏈路、極低成本 |
+| `lens` | **同一個模型 + 分角色溫度與視角（預設）** | 本專案：要一致、要可審計、要控成本 |
+| `split` | 感知層快模型、指揮層強模型、風控只准規則 | 接入 A3/A4 後，或做對照實驗 |
+
+**為什麼預設 `lens`：** A5 的價值是「可審計的解釋」，同一模型版本才能重播同一個決策；
+200 訂閱者的成本上限不允許判斷層跑三次；風控不能漂移，所以 A4 根本不該配大腦。
+代價是單一模型的知識盲區會貫穿全鏈，靠「交叉驗證 + 置信度扣分 + 單源降級」補償。
+
+完整推導、成本估算與對照實驗設計見 [`docs/BRAIN-TOPOLOGY.md`](docs/BRAIN-TOPOLOGY.md)。
+
+---
+
+## 4. 針對隊友意見的改動
+
+| 隊友說的 | 這一版的回應 | 在哪裡看 |
+|---|---|---|
+| 「A5 二次分析能力如何」 | 三層二次分析（L0/L1/L2），輸出傳導矩陣、分歧裁決、三情境、作廢條件 | 晨報頁 ①–⑥ |
+| 「同一個大腦好，定係不同大腦」 | 四拓撲可切換 + 靜態對比表 + 建議與取捨；有 key 時可跑 A/B | 大腦拓撲頁 |
+| 「餵一篇新聞，show output 睇下」 | 單篇探針：貼新聞 → 傳導鏈、受影響標的、交叉驗證、升級建議 | 單篇探針頁 |
+| 「RSS 來源太少，單一個 BBC」 | 來源覆蓋度面板：數獨立媒體、單源主題自動降級；A1 只給 `RSS` 時從 URL 反推媒體 | 晨報頁「資料充分性」 |
+| 「冇提示詞訓練過，之後要加」 | 提示詞按版本資料夾管理（`app/prompts/v1`），加 `python -m app.evaluate` 離線評測 | `docs/ARCHITECTURE.md` §5 |
+| 「去 Telegram 頻道」 | 晨報格式化推送 + `/brief` `/status` `/probe` 指令；無 token 時為誠實的預覽模式 | 晨報頁「Telegram 預覽」 |
+| 「A2 應該用爬蟲，唔止 RSS」 | A5 適配層兼容兩種 A2 schema：`/api/v1/analyses`（有方向）與 `/api/v1/public-records`（原始記錄），A2 換抓取方式不會斷鏈 | `app/connectors.py` |
+| 「關鍵詞」 | A5 自己的關注詞表（`PQ_WATCHLIST`）會重排上游訊號，命中的詞會出現在「要盯什麼」 | 晨報頁 ③ |
+
+---
+
+## 5. 快速開始
+
+### Windows（最省事）
+
+雙擊 `start.cmd`。第一次會自動建 `.venv`、裝依賴、開瀏覽器到 <http://127.0.0.1:8130>。
+
+### 手動
 
 ```bash
-# 1. 建虛擬環境並安裝
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-
-# 2. 設定
-copy .env.example .env
-# 編輯 .env：填入 PQ_LLM_API_KEY，並確認 PQ_A1_API_URL / PQ_A2_API_URL 指向正確地址
-
-# 3. 啟動（請先啟動 A1 與 A2）
+.venv\Scripts\pip install -r requirements.txt      # macOS/Linux: .venv/bin/pip
+copy .env.example .env                             # 可選，不設也能跑
 .venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8130
 ```
 
-## 接口
+開啟 <http://127.0.0.1:8130>。預設 8130，A1 假設在 8010、A2 在 8120。
+
+### 三種啟動狀態
+
+1. **A1 + A2 都在跑** → 用真實數據，兩個綠點。
+2. **A1/A2 沒開** → 整份改用內建示例資料，頁面頂部紅字標明「不真假混用」，功能全部可操作。
+3. **有 `PQ_LLM_API_KEY`** → 大腦切到 `lens`，大模型只負責「表達」，事實仍由規則層鎖定。
+
+> 任何上游失敗時**整份**改用示例資料，而不是一半真一半假——這是刻意的設計，
+> 混用比全假更危險，因為讀者分不清哪句是真的。
+
+---
+
+## 6. 介面
+
+| 頁籤 | 內容 |
+|---|---|
+| **晨報** | 主線句、三章節（發生／意味／盯什麼）、傳導矩陣、分歧裁決、情境推演、證據鏈、資料充分性、置信度、合規聲明 |
+| **單篇探針** | 貼一段新聞即出二次分析；可一鍵載入示例 |
+| **大腦拓撲** | 四拓撲卡片、模型分配圖、取捨對比表、建議；有 key 時可跑 A/B |
+| **運行記錄** | 每一次 run 的輸入、拓撲、提示詞版本、延遲、護欄結果；可重播並比對漂移 |
+| **合規** | A4 閘門狀態、禁語清單、資料限制、近期攔截 |
+
+---
+
+## 7. API
 
 | 方法 | 路徑 | 說明 |
 |---|---|---|
-| GET | `/health` | 服務是否活著 |
-| POST | `/api/v1/commander/run` | 傳 `{"question":"今天該留意什麼風險？"}`，回晨報＋證據鏈 |
+| GET | `/health` | 服務狀態 |
+| GET | `/api/v1/meta` | 版本、拓撲、提示詞、端點清單 |
+| GET | `/api/v1/upstream/health` | A1 / A2 / A4 / A5 狀態 |
+| POST | `/api/v1/commander/run` | `{"question":"…","topology":"lens"}` → 晨報 |
+| POST | `/api/v1/commander/probe` | `{"title":"","text":"…","source":"","url":""}` → 單篇分析 |
+| GET | `/api/v1/runs?limit=30` | 運行記錄 |
+| GET | `/api/v1/runs/{run_id}` | 單次詳情（含輸入快照） |
+| POST | `/api/v1/runs/{run_id}/replay` | 用同一份輸入重跑，回傳漂移 |
+| GET | `/api/v1/brain` | 四拓撲定義、對比表、建議 |
+| POST | `/api/v1/brain/compare` | 兩種 LLM 拓撲跑同一輸入（需 key） |
+| GET | `/api/v1/compliance` | 護欄配置與免責 |
+| POST | `/api/v1/telegram/render` / `send` | 推送預覽 / 實際推送 |
+| POST | `/api/v1/telegram/webhook` | Telegram 指令（`/brief` `/status` `/probe`） |
 
-互動文件：`http://127.0.0.1:8130/docs`。
+互動文件：<http://127.0.0.1:8130/api/docs>
 
-## 幾點說明
+---
 
-1. **A5 依賴 A1、A2**：正常模式要先把它們開起來，A5 才會去匯總真實數據。
-2. **獨立演示模式**：A1/A2 沒開也沒關係——A5 會自動改用內建示例資料，照樣出一份完整晨報，
-   頁面會標示「A1/A2 未連線，使用示例資料」，不造假。
-3. **密鑰安全**：`.env` 已被 `.gitignore` 擋住。
+## 8. 與 A1 / A2 的契約
+
+**A1**：`GET /api/v1/news/events?limit=N` → `{events:[{title, summary, sentiment, topics[], instruments[], confidence, source, url, published}]}`
+
+**A2**（優先）：`GET /api/v1/analyses?limit=N` → `{events:[{title, summary, direction, entities[], markets[], confidence}]}`
+
+**A2**（退化）：`GET /api/v1/public-records?order=published_desc` → 原始記錄，A5 會標記 `degraded` 並以「中性」處理。
+
+兩邊都失敗才用示例資料。任何一邊成功、另一邊失敗，仍然整份用示例（見 §5 說明）。
+
+---
+
+## 9. 目錄
+
+```
+app/
+  main.py         FastAPI 路由 + 靜態頁
+  commander.py    一次 run 的編排（取數 → 規則 → 大腦 → 護欄 → 留檔）
+  analyze.py      規則層：主題詞典、L0/L1/L2、置信度
+  probe.py        單篇新聞探針
+  brains.py       四種拓撲 + LLM 呼叫 + 提示詞載入
+  connectors.py   A1 / A2 適配與健康檢查
+  guardrails.py   禁語、證據追溯、A4 閘門
+  ledger.py       SQLite run ledger + replay
+  telegram.py     推送與指令
+  evaluate.py     離線評測（提示詞回歸）
+  prompts/v1/     提示詞（版本化）
+  fixtures/       示例資料
+  static/         單頁控制台（HTML/CSS/JS，無建置步驟）
+tests/            28 個單元與 API 測試
+docs/             架構、大腦決策、示範腳本
+```
+
+---
+
+## 10. 測試與評測
+
+```bash
+.venv\Scripts\python -m unittest discover -s tests -v   # 28 tests
+.venv\Scripts\python -m app.evaluate                     # 41 項離線驗收，全 PASS 才 exit 0
+```
+
+`app.evaluate` 是給「之後要加提示詞訓練」準備的：把「好」寫成硬條件（章節齊全、證據可追溯、
+方向合法、無禁語、閱讀時間上限、空上游不炸），改 prompt 前後跑一次就知道有沒有退化。
+
+---
+
+## 11. 限制與下一步
+
+- **A4 未接入**：所有輸出都是 `advisory_only`，不產生下單指令；這是刻意的，不是沒做完。
+- **A2 目前是 RSS**：延遲高、實體粒度粗。A5 已兼容爬蟲版 schema，A2 換引擎時不用改 A5。
+- **規則層的主題詞典是手工的**：新主題（例如碳關稅）會落到宏觀桶，需要補詞。這是 `evaluate` 要守的東西。
+- **單篇探針的方向判斷是詞典法**：接上大模型後會補語氣與上下文；現在的分數只用於排序，不用於決策。
+- 下一步：A3 執行意圖、A4 風控閘門、Telegram webhook 正式部署、提示詞 A/B（`v2`）。
+
+---
+
+## 12. 定位
+
+研究與決策輔助工具。不代客理財、不託管資金、不構成投資建議。
+政治人物表態的市場影響僅為概率標籤，非因果證明。

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrismQuant · A5 指揮官</title>
+<meta name="description" content="PrismQuant A5 Commander — 把 A1 新聞與 A2 政要監控匯總成決策級晨報，含二次分析、大腦拓撲與合規護欄。">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230b0f15'/><path d='M8 22 L14 9 L18 17 L24 8' stroke='%235b9cf8' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+</head>
+<body>
+
+<div class="app">
+
+  <aside class="rail">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M5 23 L12 8 L17 18 L27 6" fill="none" stroke="url(#pg)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs><linearGradient id="pg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#5b9cf8"/><stop offset="0.55" stop-color="#a78bfa"/><stop offset="1" stop-color="#f472b6"/>
+        </linearGradient></defs>
+      </svg>
+      <div class="brand-txt">
+        <strong>PrismQuant</strong>
+        <span>A5 Commander</span>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <button class="nav-item is-active" data-view="brief">
+        <span class="nav-ico">◧</span><span>晨報</span><em>BRIEF</em>
+      </button>
+      <button class="nav-item" data-view="probe">
+        <span class="nav-ico">◎</span><span>單篇探針</span><em>PROBE</em>
+      </button>
+      <button class="nav-item" data-view="brain">
+        <span class="nav-ico">⌬</span><span>大腦拓撲</span><em>BRAIN</em>
+      </button>
+      <button class="nav-item" data-view="runs">
+        <span class="nav-ico">▤</span><span>運行記錄</span><em>LEDGER</em>
+      </button>
+      <button class="nav-item" data-view="compliance">
+        <span class="nav-ico">⛨</span><span>合規</span><em>GUARD</em>
+      </button>
+    </nav>
+
+    <div class="rail-panel">
+      <div class="rail-title">上游狀態</div>
+      <div id="railUpstream" class="rail-upstream">
+        <div class="skel-line"></div><div class="skel-line"></div><div class="skel-line"></div>
+      </div>
+    </div>
+
+    <div class="rail-foot">
+      <span id="railVersion">v0.2.0</span>
+      <span class="dot-sep">·</span>
+      <span id="railPrompt">prompt v1</span>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="crumb" id="crumb">晨報 · MORNING BRIEF</div>
+        <h1 class="view-title" id="viewTitle">今日決策輸入</h1>
+      </div>
+      <div class="topbar-right">
+        <div class="clock" id="clock">--:--</div>
+        <div class="badge" id="badgeBrain">—</div>
+        <div class="badge badge-gate" id="badgeGate">A4 未接入</div>
+      </div>
+    </header>
+
+    <!-- ============ 晨報 ============ -->
+    <section class="view is-active" id="view-brief">
+      <div class="askbar">
+        <div class="askbar-row">
+          <input id="q" class="ask-input" placeholder="問指揮官，例如：今天該留意什麼風險？" autocomplete="off">
+          <button class="btn btn-primary" id="btnRun">生成晨報</button>
+        </div>
+        <div class="chips">
+          <button class="chip" data-q="生成今天的晨報">今日晨報</button>
+          <button class="chip" data-q="今天該留意什麼風險？只講政策和關稅">風險優先</button>
+          <button class="chip" data-q="只看政策面：A2 有哪些表態會影響港股？">只看政策面</button>
+          <button class="chip" data-q="匯總 A1 和 A2 的最新結論，並指出分歧">匯總 A1 + A2</button>
+        </div>
+      </div>
+
+      <div class="status-grid" id="statusGrid">
+        <div class="status-tile"><span class="st-name">A1 新聞</span><span class="st-val">—</span></div>
+        <div class="status-tile"><span class="st-name">A2 政要</span><span class="st-val">—</span></div>
+        <div class="status-tile"><span class="st-name">A4 風控</span><span class="st-val">—</span></div>
+        <div class="status-tile"><span class="st-name">大腦</span><span class="st-val">—</span></div>
+      </div>
+
+      <div id="briefOut" class="stack">
+        <div class="empty">
+          <div class="empty-mark">◧</div>
+          <h3>尚未生成</h3>
+          <p>按「生成晨報」，A5 會取 A1 新聞與 A2 政要監控，做交叉驗證與情境推演。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 探針 ============ -->
+    <section class="view" id="view-probe">
+      <div class="probe-grid">
+        <div class="card card-form">
+          <div class="card-head">
+            <h2>貼一段新聞，看 A5 怎麼二次分析</h2>
+            <p>不是摘要：它會判斷這條消息屬於哪條線、怎麼傳導、上游是否已經講過、值不值得交給 A3。</p>
+          </div>
+          <label class="field"><span>標題（可留空，會取正文首句）</span>
+            <input id="probeTitle" class="input" placeholder="例：美國擬擴大先進芯片設備出口限制">
+          </label>
+          <label class="field"><span>正文</span>
+            <textarea id="probeText" class="input textarea" rows="9" placeholder="貼上新聞正文，中英文都可以…"></textarea>
+          </label>
+          <div class="field-row">
+            <label class="field"><span>來源</span>
+              <input id="probeSource" class="input" placeholder="Reuters / SCMP / Telegram">
+            </label>
+            <label class="field"><span>連結</span>
+              <input id="probeUrl" class="input" placeholder="https://...">
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="btnProbe">分析這篇</button>
+            <button class="btn btn-ghost" id="btnProbeSample">用示例新聞</button>
+          </div>
+        </div>
+        <div id="probeOut" class="probe-out">
+          <div class="empty">
+            <div class="empty-mark">◎</div>
+            <h3>等待輸入</h3>
+            <p>貼一篇新聞，A5 會給出傳導鏈、受影響標的、交叉驗證與升級建議。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 大腦 ============ -->
+    <section class="view" id="view-brain">
+      <div class="section-head">
+        <h2>四種拓撲的差別</h2>
+        <p>A5 是唯一面向使用者的角色，所以「用哪個大腦」不是技術偏好，是成本、審計與偏誤的取捨。以下四種都能跑，切換後下一次生成即生效。</p>
+      </div>
+      <div class="topo-grid" id="topoGrid"></div>
+      <div class="brain-diagram" id="brainDiagram"></div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-head"><h3>四種拓撲的取捨</h3></div>
+          <div class="table-wrap" id="cmpTable"></div>
+        </div>
+        <div class="card card-rec">
+          <div class="card-head"><h3>我們的選擇</h3></div>
+          <div id="recBody"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h3>對照實驗</h3>
+          <p>用同一份輸入跑兩種 LLM 拓撲，比對置信度、引用數、延遲與 tokens。沒有 key 時這顆按鈕會誠實地停用。</p>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" id="btnCompare">跑一次對照（lens vs split）</button>
+          <span class="hint" id="cmpHint"></span>
+        </div>
+        <div id="cmpOut"></div>
+      </div>
+    </section>
+
+    <!-- ============ 運行記錄 ============ -->
+    <section class="view" id="view-runs">
+      <div class="section-head">
+        <h2>每一次輸出都留檔</h2>
+        <p>proposal §3.4 要求「可重播這個決策」。這裡存的是輸入快照 + 當時的拓撲與提示詞版本，replay 是重跑再比對漂移，不是重播舊畫面。</p>
+      </div>
+      <div class="stat-row" id="runStats"></div>
+      <div class="card">
+        <div class="table-wrap" id="runsTable"></div>
+      </div>
+      <div id="runDetail"></div>
+    </section>
+
+    <!-- ============ 合規 ============ -->
+    <section class="view" id="view-compliance">
+      <div class="section-head">
+        <h2>合規護欄</h2>
+        <p>A5 對外說話前的最後一道閘：禁語掃描、證據可追溯、A4 未接入時只有建議權。</p>
+      </div>
+      <div id="complianceOut"></div>
+    </section>
+
+    <footer class="foot">
+      <span>PrismQuant · A5 Commander</span>
+      <span class="foot-sep">/</span>
+      <span>研究與決策輔助工具，不構成投資建議</span>
+      <span class="foot-sep">/</span>
+      <span id="footRun">—</span>
+    </footer>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Telegram 預覽 -->
+<div class="modal" id="tgModal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <strong>Telegram 推送預覽</strong>
+      <button class="icon-btn" id="tgClose">✕</button>
+    </div>
+    <div class="phone">
+      <div class="phone-top"><span>PrismQuant 頻道</span><span id="tgTime">—</span></div>
+      <pre class="phone-msg" id="tgMsg"></pre>
+    </div>
+    <div class="modal-foot">
+      <span class="hint" id="tgHint"></span>
+      <button class="btn btn-ghost" id="tgCopy">複製全文</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
