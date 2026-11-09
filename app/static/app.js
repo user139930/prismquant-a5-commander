@@ -152,7 +152,7 @@ function renderStatus(payload) {
     tile('A1 新聞', s1, c1) +
     tile('A2 政要', s2, c2) +
     tile('A4 風控', '未接入', 'warn') +
-    tile('大腦', brain ? (brain.mode === 'llm' ? 'LLM · ' + brain.label : '規則 · ' + brain.label) : '待命', brain && brain.degraded ? 'warn' : 'ok');
+    tile('大腦', brain ? (brain.mode === 'llm' ? 'LLM · ' + String(brain.topology || '').toUpperCase() : '規則引擎') : '待命', brain && brain.degraded ? 'warn' : 'ok');
 
   if (payload && payload.source_note) {
     // 只顯示一次提示，放在 status 之後
@@ -188,7 +188,7 @@ function renderBrief(p) {
 
   const hero = `<div class="hero">
     <div class="hero-eyebrow">
-      <span>MORNING BRIEF</span><span class="sep">/</span>
+      <span class="live"></span><span>MORNING BRIEF</span><span class="sep">/</span>
       <span>${esc((p.generated_at || '').replace('T', ' ').slice(0, 16))}</span><span class="sep">/</span>
       <span>${esc(brain.mode === 'llm' ? 'LLM' : 'RULE')} · ${esc(brain.label || '')}</span>
     </div>
@@ -263,13 +263,6 @@ function renderBrief(p) {
     ${(q.notes || []).map(n => `<div class="note-line info">· ${esc(n)}</div>`).join('')}
     ${q.single_source_topics && q.single_source_topics.length ? `<div class="note-line">單一來源已降級：${esc(q.single_source_topics.join('、'))}</div>` : ''}`;
 
-  const confInner = `
-    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
-      ${confPill(conf)}
-      <span class="hint">這個分數不是模型自評，是加減分規則算出來的，每一項都列在下面。</span>
-    </div>
-    <ul class="conf-reasons">${(conf.reasons || []).map(r => `<li>${esc(r)}</li>`).join('')}</ul>`;
-
   const guard = p.guard || {};
   const guardInner = `<div class="note-line ${guard.passed ? '' : 'bad'}" style="margin-top:0">
       ${guard.passed ? '⛨' : '⛔'} ${esc(guard.note || '')}
@@ -291,35 +284,82 @@ function renderBrief(p) {
       ${missingNotes.length ? `<div class="cov-note">${missingNotes.map(esc).join('　·　')}</div>` : ''}
     </div>` : '';
 
-  out.innerHTML = (notes.length ? `<div class="banner-row">${notes.join('')}</div>` : '') + hero + covBlock +
-    `<div id="diffSlot"></div>` +
-    `<div class="stack">
-      ${secBlock('1', '發生了什麼', 'FACTS', bullets(s.what_happened))}
-      ${secBlock('2', '這意味著什麼', 'SO WHAT', bullets(s.so_what))}
-      ${secBlock('3', '要盯什麼', 'WATCH', `<div class="watch-grid">${watchCards || '<div class="hint">（無）</div>'}</div>`)}
-    </div>
-    ${secBlock('4', '傳導矩陣', 'TRANSMISSION', `<div class="table-wrap"><table>
-      <thead><tr><th>起點</th><th>通道</th><th>標的</th><th>方向</th><th>強度</th><th>時間尺度</th><th>證據</th></tr></thead>
-      <tbody>${transRows || '<tr><td colspan="7" class="hint">（無）</td></tr>'}</tbody></table></div>`)}
-    ${conflictBlocks ? secBlock('5', '分歧裁決', 'CONFLICT', conflictBlocks) : ''}
-    ${secBlock(conflictBlocks ? '6' : '5', '情境推演', 'SCENARIOS', `<div class="scn-grid">${scnCards}
-        <div class="scn pos empty">
-          <div class="scn-top"><span class="scn-name">倉位含義</span><span class="scn-prob">—</span></div>
-          <p>留空：需要 A4 風控回報 gate 狀態，A5 才能講倉位。目前 A4 未接入，這一段不生成。</p>
-          <div class="trig">等 A4 提供 /api/v1/risk/check</div>
-        </div>
-        <div class="scn pos empty">
-          <div class="scn-top"><span class="scn-name">執行意圖</span><span class="scn-prob">—</span></div>
-          <p>留空：A3 未實作，本頁不產生任何標的建議或下單意圖，只做研究輸出。</p>
-          <div class="trig">等 A3 提供 /api/v1/intents</div>
+  // ---- 側欄：置信度 gauges / 資料 / 用量 ----
+  const scnP = {};
+  (p.scenarios || []).forEach(x => { scnP[x.name] = x.prob || 0; });
+  const scnBar = `<div class="scn-bar">
+      <i class="bear" style="width:${((scnP['偏空情境'] || 0) * 100).toFixed(1)}%"></i>
+      <i class="base" style="width:${((scnP['基準情境'] || 0) * 100).toFixed(1)}%"></i>
+      <i class="bull" style="width:${((scnP['偏多情境'] || 0) * 100).toFixed(1)}%"></i>
+    </div>`;
+
+  const score = (conf && conf.score) != null ? conf.score : 0;
+  const circ = 2 * Math.PI * 28;
+  const confCard = `<div class="side-card">
+      <h4>置信度 / CONFIDENCE</h4>
+      <div class="gauge">
+        <svg class="gauge-ring ${score >= 0.7 ? 'high' : score < 0.5 ? 'low' : ''}" viewBox="0 0 64 64">
+          <circle class="bg" cx="32" cy="32" r="28" fill="none" stroke-width="3.5"/>
+          <circle class="fg" cx="32" cy="32" r="28" fill="none" stroke-width="3.5"
+            stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${(circ * (1 - Math.min(1, Math.max(0, score)))).toFixed(1)}"
+            transform="rotate(-90 32 32)"/>
+        </svg>
+        <div>
+          <div class="gauge-num">${score.toFixed(2)}</div>
+          <div class="gauge-level">${esc(conf.level || '')}　·　加減分規則</div>
         </div>
       </div>
-      <div class="hint" style="margin-top:10px">情境權重由情緒分佈與交叉驗證強度加權得出，是可解釋的相對權重，不是價格預測。</div>`)}
-    ${secBlock(conflictBlocks ? '7' : '6', '證據鏈', 'EVIDENCE', `<div class="ev-list">${evRows || '<div class="hint">（無）</div>'}</div>`)}
-    <div class="two-col">
-      <section class="sec"><div class="sec-head"><span class="sec-num">D</span><h3>資料充分性</h3><span class="sec-sub">DATA QUALITY</span></div>${qualityInner}</section>
-      <section class="sec"><div class="sec-head"><span class="sec-num">C</span><h3>置信度</h3><span class="sec-sub">CONFIDENCE</span></div>${confInner}</section>
+      <ul class="conf-reasons">${(conf.reasons || []).map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+    </div>`;
+
+  const usage = p.usage || {};
+  const usageCard = `<div class="side-card">
+      <h4>本次執行 / RUN</h4>
+      <div class="usage-grid">
+        <div class="usage-item"><div class="u-k">MODE</div><div class="u-v" style="font-size:11px">${esc((p.brain || {}).mode === 'llm' ? 'LLM' : '規則')}</div></div>
+        <div class="usage-item"><div class="u-k">LATENCY</div><div class="u-v">${(p.stats || {}).latency_ms || 0}<span>ms</span></div></div>
+        <div class="usage-item"><div class="u-k">TOKENS</div><div class="u-v">${(usage.total_tokens || 0).toLocaleString()}</div></div>
+        <div class="usage-item"><div class="u-k">COST</div><div class="u-v" style="font-size:11px">${usage.priced && usage.cost_usd ? '≈ $' + Number(usage.cost_usd).toFixed(4) : '—'}</div></div>
+      </div>
+      <div class="hint" style="margin-top:10px">拓撲 ${esc((p.brain || {}).topology || '')}　·　prompt ${esc((p.brain || {}).prompt_variant || '')}</div>
+    </div>`;
+
+  out.innerHTML = (notes.length ? `<div class="banner-row">${notes.join('')}</div>` : '') + hero + covBlock +
+    `<div id="diffSlot"></div>` +
+    `<div class="brief-layout">
+      <div class="brief-main">
+        ${secBlock('01', '發生了什麼', 'FACTS', bullets(s.what_happened))}
+        ${secBlock('02', '這意味著什麼', 'SO WHAT', bullets(s.so_what))}
+        ${secBlock('03', '要盯什麼', 'WATCH', `<div class="watch-grid">${watchCards || '<div class="hint">（無）</div>'}</div>`)}
+        ${secBlock('04', '傳導矩陣', 'TRANSMISSION', `<div class="table-wrap"><table>
+          <thead><tr><th>起點</th><th>通道</th><th>標的</th><th>方向</th><th>強度</th><th>時間尺度</th><th>證據</th></tr></thead>
+          <tbody>${transRows || '<tr><td colspan="7" class="hint">（無）</td></tr>'}</tbody></table></div>`)}
+        ${conflictBlocks ? secBlock('05', '分歧裁決', 'CONFLICT', conflictBlocks) : ''}
+        ${secBlock(conflictBlocks ? '06' : '05', '情境推演', 'SCENARIOS', `${scnBar}<div class="scn-grid three">${scnCards}</div>
+            <div class="scn-grid two" style="margin-top:12px">
+              <div class="scn pos empty">
+                <div class="scn-top"><span class="scn-name">倉位含義</span><span class="scn-prob">—</span></div>
+                <p>留空：需要 A4 回報 gate 狀態，A5 才能講倉位。A4 未接入，這段不生成。</p>
+                <div class="trig">等 A4 提供 /api/v1/risk/check</div>
+              </div>
+              <div class="scn pos empty">
+                <div class="scn-top"><span class="scn-name">執行意圖</span><span class="scn-prob">—</span></div>
+                <p>留空：A3 未實作。本頁不產生任何標的建議或下單意圖，只做研究輸出。</p>
+                <div class="trig">等 A3 提供 /api/v1/intents</div>
+              </div>
+            </div>
+          <div class="hint" style="margin-top:12px">情境權重由情緒分佈與交叉驗證強度加權得出，是可解釋的相對權重，不是價格預測。</div>`)}
+      </div>
+      <aside class="brief-side">
+        ${confCard}
+        <div class="side-card">
+          <h4>資料充分性 / DATA</h4>
+          ${qualityInner}
+        </div>
+        ${usageCard}
+      </aside>
     </div>
+    ${secBlock(conflictBlocks ? '07' : '06', '證據鏈', 'EVIDENCE', `<div class="ev-list">${evRows || '<div class="hint">（無）</div>'}</div>`)}
     ${secBlock('G', '合規與風險聲明', 'GUARDRAIL', guardInner)}
     <details class="raw-box">
       <summary>原始資料（給驗收與除錯用）</summary>
@@ -705,25 +745,36 @@ function renderProbe(p) {
     </div>
 
     <section class="sec">
-      <div class="sec-head"><span class="sec-num">1</span><h3>傳導鏈</h3><span class="sec-sub">TRANSMISSION</span></div>
+      <div class="sec-head"><span class="sec-num">01</span><h3>傳導鏈</h3><span class="sec-sub">TRANSMISSION</span></div>
       <div class="chain">${chain}</div>
     </section>
 
     <div class="two-col">
       <section class="sec">
-        <div class="sec-head"><span class="sec-num">2</span><h3>受影響標的</h3><span class="sec-sub">ASSETS</span></div>
+        <div class="sec-head"><span class="sec-num">02</span><h3>受影響標的</h3><span class="sec-sub">ASSETS</span></div>
         <div class="table-wrap"><table><thead><tr><th>標的</th><th>方向</th><th>時間尺度</th></tr></thead>
         <tbody>${assets || '<tr><td colspan="3" class="hint">（無）</td></tr>'}</tbody></table></div>
       </section>
       <section class="sec">
         <div class="sec-head"><span class="sec-num">C</span><h3>置信度</h3><span class="sec-sub">CONFIDENCE</span></div>
-        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">${confPill(c)}</div>
+        <div class="gauge">
+          <svg class="gauge-ring ${(c.score || 0) >= 0.7 ? 'high' : (c.score || 0) < 0.5 ? 'low' : ''}" viewBox="0 0 64 64">
+            <circle class="bg" cx="32" cy="32" r="28" fill="none" stroke-width="3.5"/>
+            <circle class="fg" cx="32" cy="32" r="28" fill="none" stroke-width="3.5"
+              stroke-dasharray="175.9" stroke-dashoffset="${(175.9 * (1 - Math.min(1, Math.max(0, c.score || 0)))).toFixed(1)}"
+              transform="rotate(-90 32 32)"/>
+          </svg>
+          <div>
+            <div class="gauge-num">${(c.score || 0).toFixed(2)}</div>
+            <div class="gauge-level">${esc(c.level || '')}　·　加權規則</div>
+          </div>
+        </div>
         <ul class="conf-reasons">${(c.reasons || []).map(r => `<li>${esc(r)}</li>`).join('')}</ul>
       </section>
     </div>
 
     <section class="sec">
-      <div class="sec-head"><span class="sec-num">3</span><h3>交叉驗證</h3><span class="sec-sub">CORROBORATION</span></div>
+      <div class="sec-head"><span class="sec-num">03</span><h3>交叉驗證</h3><span class="sec-sub">CORROBORATION</span></div>
       <div class="note-line info" style="margin-top:0">${esc(co.note || '')}</div>
       <div class="pill-row">${(co.publishers || []).map(x => `<span class="meta-item">${esc(x)}</span>`).join('')}</div>
       ${matched ? `<div style="margin-top:10px"><div class="hint" style="margin-bottom:4px">同事件報導</div><div class="ev-list">${matched}</div></div>` : ''}
@@ -731,7 +782,7 @@ function renderProbe(p) {
     </section>
 
     <section class="sec">
-      <div class="sec-head"><span class="sec-num">4</span><h3>什麼會改變這個判斷</h3><span class="sec-sub">INVALIDATION</span></div>
+      <div class="sec-head"><span class="sec-num">04</span><h3>什麼會改變這個判斷</h3><span class="sec-sub">INVALIDATION</span></div>
       <ul class="bullets">${(p.what_would_change || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>
       ${(p.caveats || []).map(x => `<div class="note-line info">· ${esc(x)}</div>`).join('')}
       <div class="note-line" style="margin-top:10px">⛨ ${esc((p.guard || {}).note || '')}</div>
@@ -965,7 +1016,7 @@ function historyCard(r) {
       <div class="tl-top">
         <span class="tag tag-flat">${kind}</span>
         <span class="tag ${r.mode === 'llm' ? 'tag-a1' : 'tag-a2'}">${r.mode === 'llm' ? 'LLM' : '規則'}</span>
-        <span class="mono" style="font-size:10.5px;color:var(--tx-3)">置信 ${(r.confidence || 0).toFixed(2)}</span>
+        ${r.kind === 'chat' ? '' : `<span class="mono" style="font-size:10.5px;color:var(--tx-3)">置信 ${(r.confidence || 0).toFixed(2)}</span>`}
         <span class="hint">${esc(r.topology || '')}</span>
         <span class="hint" style="margin-left:auto">${r.latency_ms || 0}ms</span>
         ${canPick ? `<button class="btn btn-ghost btn-sm" data-pick="${esc(r.run_id)}">${picked ? '已選' : '選'}</button>` : ''}
@@ -1212,6 +1263,20 @@ async function init() {
     if (!t) return toast('先貼一段新聞正文', true);
     doProbe(t, $('#probeTitle').value, $('#probeSource').value, $('#probeUrl').value);
   };
+  // 鍵盤：⌘/Ctrl+Enter 送出，/ 聚焦輸入框
+  document.addEventListener('keydown', e => {
+    const typing = /^(INPUT|TEXTAREA)$/.test((e.target.tagName || ''));
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (S.view === 'probe') $('#btnProbe')?.click();
+      else runBrief($('#q').value);
+    } else if (e.key === '/' && !typing) {
+      e.preventDefault();
+      if (S.view === 'probe') $('#probeText').focus();
+      else $('#q').focus();
+    }
+  });
+
   $('#btnProbeSample').onclick = () => {
     $('#probeTitle').value = PROBE_SAMPLE.title;
     $('#probeText').value = PROBE_SAMPLE.text;
@@ -1314,5 +1379,11 @@ async function init() {
     runBrief('生成今天的晨報');
   }
 }
+
+window.addEventListener('hashchange', () => {
+  const h = (location.hash || '#brief').replace('#', '');
+  if (h.startsWith('brief/')) { loadStoredBrief(h.slice(6)); return; }
+  if (VIEW_META[h]) switchView(h, true);
+});
 
 document.addEventListener('DOMContentLoaded', init);
