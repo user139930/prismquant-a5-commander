@@ -5,6 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PrismQuant · A5 指揮官</title>
 <meta name="description" content="PrismQuant A5 Commander — 把 A1 新聞與 A2 政要監控匯總成決策級晨報，含二次分析、大腦拓撲與合規護欄。">
+<script>
+/* 先套主題再載入樣式，避免開頁閃一下 */
+(function(){
+  try {
+    var q = new URLSearchParams(location.search).get('theme');
+    var t = (q === 'light' || q === 'dark') ? q : localStorage.getItem('pq-theme');
+    if (!t) t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+</script>
 <link rel="stylesheet" href="/static/app.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230b0f15'/><path d='M8 22 L14 9 L18 17 L24 8' stroke='%235b9cf8' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 </head>
@@ -55,7 +68,7 @@
     </div>
 
     <div class="rail-foot">
-      <span id="railVersion">v0.7.0</span>
+      <span id="railVersion">v0.8.0</span>
       <span class="dot-sep">·</span>
       <span id="railPrompt">prompt v1</span>
     </div>
@@ -69,6 +82,7 @@
         <h1 class="view-title" id="viewTitle">今日決策輸入</h1>
       </div>
       <div class="topbar-right">
+        <button class="theme-btn" id="themeBtn" aria-label="切換明暗主題" title="切換明暗主題"></button>
         <div class="clock" id="clock">--:--</div>
         <div class="badge" id="badgeBrain">—</div>
         <div class="badge badge-gate" id="badgeGate">A4 未接入</div>

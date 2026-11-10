@@ -18,6 +18,37 @@ const S = {
   brief: null, probe: null, brain: null, runs: [], selectedRun: null, busy: false,
 };
 
+/* ---------------------------------------------------------------- 主題 */
+
+const THEME_KEY = 'pq-theme';
+const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4.1"/><path d="M12 3v1.8M12 19.2V21M3 12h1.8M19.2 12H21M5.6 5.6l1.3 1.3M17.1 17.1l1.3 1.3M18.4 5.6l-1.3 1.3M6.9 17.1l-1.3 1.3"/></svg>';
+const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M20 14.3A8.3 8.3 0 1 1 9.7 4a6.6 6.6 0 0 0 10.3 10.3z"/></svg>';
+
+function currentTheme() {
+  return document.documentElement.getAttribute('data-theme') || 'dark';
+}
+
+function paintThemeBtn() {
+  const btn = $('#themeBtn');
+  if (!btn) return;
+  const dark = currentTheme() === 'dark';
+  btn.innerHTML = dark ? SUN : MOON;   // 深色時顯示太陽（點下去變淺色）
+  btn.title = dark ? '切換到淺色' : '切換到深色';
+}
+
+function applyTheme(theme, remember) {
+  document.documentElement.setAttribute('data-theme', theme);
+  if (remember) { try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* 私密模式 */ } }
+  paintThemeBtn();
+}
+
+function toggleTheme() {
+  const html = document.documentElement;
+  html.classList.add('theme-anim');
+  applyTheme(currentTheme() === 'dark' ? 'light' : 'dark', true);
+  setTimeout(() => html.classList.remove('theme-anim'), 320);
+}
+
 /* ---------------------------------------------------------------- 工具 */
 
 function esc(v) {
@@ -1368,6 +1399,14 @@ function tickClock() {
 async function init() {
   tickClock();
   setInterval(tickClock, 1000);
+  paintThemeBtn();
+  const tb = $('#themeBtn');
+  if (tb) tb.onclick = toggleTheme;
+  try {
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
+      if (!localStorage.getItem(THEME_KEY)) applyTheme(e.matches ? 'light' : 'dark', false);
+    });
+  } catch (e) { /* 舊瀏覽器沒有 matchMedia 事件 */ }
 
   $('#nav').addEventListener('click', e => {
     const b = e.target.closest('.nav-item');
