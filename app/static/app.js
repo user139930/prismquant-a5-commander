@@ -217,6 +217,7 @@ function bullets(list) {
 function renderBrief(p) {
   S.brief = p;
   const out = $('#briefOut');
+  out.classList.remove('is-chat');
   const conf = p.confidence || {};
   const q = p.data_quality || {};
   const brain = p.brain || {};
@@ -706,6 +707,7 @@ async function runBrief(question) {
 function renderChat(p) {
   S.brief = null;
   const out = $('#briefOut');
+  out.classList.add('is-chat');
   out.innerHTML = `<div class="chat-card">
     <div class="cc-head">
       <span class="tag tag-a1">A5 指揮官</span>
@@ -1013,7 +1015,7 @@ function renderBrain() {
   const rows = (d.comparison_table || []).map(r => `<tr>
       <td style="color:var(--tx-3)">${esc(r.dim)}</td>
       <td>${esc(r.shared)}</td>
-      <td style="background:rgba(91,156,248,.05);color:#dbe9f8">${esc(r.lens)}</td>
+      <td class="cmp-hl">${esc(r.lens)}</td>
       <td>${esc(r.split)}</td>
     </tr>`).join('');
   $('#cmpTable').innerHTML = `<table><thead><tr><th>維度</th><th>共用大腦</th><th>單腦多視角</th><th>分層大腦</th></tr></thead><tbody>${rows}</tbody></table>`;
