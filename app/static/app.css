@@ -989,3 +989,13 @@ html[data-theme="light"] .rec-why li::before{color:var(--accent)}
 .kb-body{min-width:0;flex:1}
 .kb-title{font-size:12px;font-weight:500;color:var(--tx);margin-bottom:3px}
 .kb-text{font-size:11px;line-height:1.65;color:var(--tx-3)}
+
+/* 上游接入面板：沒有 A1/A2 時必須一眼看出是 0/3，不能像「在線」 */
+.rail-sub{display:block;margin-top:3px;font-size:8.5px;letter-spacing:.02em;
+  color:var(--tx-4);text-transform:none;font-family:var(--sans)}
+.up-sum{font-size:9.5px;letter-spacing:.03em;color:var(--tx-3);margin-bottom:9px;
+  padding-bottom:8px;border-bottom:1px solid var(--hairline);line-height:1.5}
+.up-sum b{font-family:var(--mono);font-size:10.5px;color:var(--tx-2);font-weight:600}
+.up-sum.warn b{color:var(--warn-ink)}
+.up-row.off{color:var(--tx-4)}
+.up-row.off .ms{color:var(--tx-4)}

@@ -157,12 +157,17 @@ function renderRail(health) {
     ['A2 政要', health.a2],
     ['A4 風控', health.a4],
   ];
-  $('#railUpstream').innerHTML = rows.map(([name, st]) => {
+  const okCount = rows.filter(([, st]) => st && st.ok).length;
+  const items = rows.map(([name, st]) => {
     const ok = st && st.ok;
-    const cls = ok ? 'ok' : (st && st.status === 'not_connected' ? '' : 'bad');
-    const ms = st && st.latency_ms != null ? st.latency_ms + 'ms' : (ok ? '' : 'off');
-    return `<div class="up-row ${cls}"><span class="dot"></span><span>${esc(name)}</span><span class="ms">${esc(ms)}</span></div>`;
+    const label = ok ? (st.latency_ms != null ? st.latency_ms + 'ms' : '已連線') : '未接入';
+    return `<div class="up-row ${ok ? 'ok' : 'off'}"><span class="dot"></span><span>${esc(name)}</span><span class="ms">${esc(label)}</span></div>`;
   }).join('');
+  // 先講清楚「幾個真的接上了」：沒有 A1/A2 時，這裡必須一眼看出是 0/3，不是假裝在線
+  const sum = okCount === 0
+    ? '<div class="up-sum warn"><b>0/3 已接入</b> · 只有 A5 在跑，用內建示例資料</div>'
+    : `<div class="up-sum"><b>${okCount}/3 已接入</b></div>`;
+  $('#railUpstream').innerHTML = sum + items;
 }
 
 function renderStatus(payload) {

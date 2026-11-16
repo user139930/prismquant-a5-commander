@@ -1,50 +1,96 @@
 @echo off
 rem PrismQuant A5 Commander - one-click launcher
-rem 1) å…ˆè©¦æœ¬æ©Ÿå·²è£å¥½ä¾è³´çš„ Pythonï¼ˆç§’é–‹ï¼‰
-rem 2) å¦å‰‡ç”¨ python / py -3 å»º .venv è£ä¾è³´
-rem æ²’æœ‰ .env ä¹Ÿèƒ½è·‘ï¼šæœƒç”¨è¦å‰‡å¼•æ“ + å…§å»ºç¤ºä¾‹è³‡æ–™ï¼Œé é¢æœƒæ¨™æ˜ã€‚
-setlocal
+rem ß@‚€™n°¸Ö»×öÈı¼şÊÂ£ºÕÒ Python¡¢´_ÕJÒÀÙ‡¡¢†¢„Ó·ş„Õ¡£
+rem ²»ĞèÒª .env£¬Ò²²»ĞèÒª API key£»›]ÓĞ key •şÓÃÒ„tÒıÇæ£¬í“Ãæ•ş˜ËÃ÷¡£
+setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
-set "PY=C:/Users/Admin/.workbuddy/binaries/python/versions/3.13.12/python.exe"
-if not exist "%PY%" goto :setup
-"%PY%" -c "import fastapi,uvicorn,httpx,pydantic_settings" >nul 2>&1
-if errorlevel 1 goto :setup
-goto :run
+set "PORT=8130"
+set "URL=http://127.0.0.1:%PORT%"
 
-:setup
-if exist ".venv\Scripts\python.exe" goto :deps
-echo [1/3] å»ºç«‹è™›æ“¬ç’°å¢ƒ .venv ...
-python -m venv .venv 2>nul
-if not exist ".venv\Scripts\python.exe" py -3 -m venv .venv 2>nul
-if not exist ".venv\Scripts\python.exe" goto :nopython
+echo.
+echo   PrismQuant A5 Commander
+echo   ========================================
+echo.
+
+rem ---------- 1) ·ş„ÕÒÑ½›ÔÚÅÜ£¿Ö±½Óé_gÓ[Æ÷ ----------
+netstat -ano | findstr /c:":%PORT% " | findstr /i "LISTENING" >nul 2>&1
+if not errorlevel 1 (
+  echo   [i] ßB½Ó²º %PORT% ÒÑ½›ÓĞ·ş„ÕÔÚÅÜ£¬Ö±½Óé_gÓ[Æ÷¡£
+  echo       Èç¹ûÄÇ²»ÊÇÄãé_µÄ£¬êPµôÄÇ‚€Ò•´°ÔÙ»Øí¡£
+  start "" "%URL%"
+  echo.
+  pause
+  goto :eof
+)
+
+rem ---------- 2) ÕÒ Python ----------
+set "PY=.venv\Scripts\python.exe"
+if exist "%PY%" goto :deps
+
+set "BOOT="
+python -c "import sys" >nul 2>&1
+if not errorlevel 1 set "BOOT=python"
+if not defined BOOT (
+  py -3 -c "import sys" >nul 2>&1
+  if not errorlevel 1 set "BOOT=py -3"
+)
+if not defined BOOT (
+  for %%V in (313 312 311) do (
+    if exist "%LOCALAPPDATA%\Programs\Python\Python%%V\python.exe" (
+      set "BOOT=%LOCALAPPDATA%\Programs\Python\Python%%V\python.exe"
+    )
+  )
+)
+if not defined BOOT goto :nopython
+
+echo   [1/3] ½¨Á¢Ì“”M­h¾³ .venv£¨µÚÒ»´Î¼s 30 Ãë£©...
+%BOOT% -m venv .venv
+if not exist "%PY%" goto :nopython
 
 :deps
-set "PY=.venv\Scripts\python.exe"
-echo [2/3] å®‰è£ä¾è³´ï¼ˆç¬¬ä¸€æ¬¡æœƒæ…¢ä¸€é»ï¼‰...
-"%PY%" -m pip install -q --disable-pip-version-check -r requirements.txt
-if errorlevel 1 goto :pipfail
+echo   [2/3] ™z²éÒÀÙ‡...
+"%PY%" -c "import fastapi,uvicorn,httpx,pydantic_settings" >nul 2>&1
+if errorlevel 1 (
+  echo         µÚÒ»´ÎÒªÏÈ°²Ñb£¬¼s 1-2 ·ÖçŠ£¬Õˆ²»ÒªêPµôß@‚€Ò•´°...
+  "%PY%" -m pip install -q --disable-pip-version-check -r requirements.txt
+  if errorlevel 1 goto :pipfail
+)
 
 :run
+echo   [3/3] †¢„Ó·ş„Õ...
 echo.
-echo   PrismQuant A5 Commander     http://127.0.0.1:8130
-echo   é—œæ‰é€™å€‹è¦–çª—å°±æœƒåœæ­¢æœå‹™
+echo   ¾WÖ·   %URL%
+echo   Ê×í“   %URL%/#brief
+echo   »ù½¨   %URL%/#infra      £¨»Ø´ğê ÓÑÎå‚€†–î}µÄÄÇÒ»í“£©
 echo.
-start "" "http://127.0.0.1:8130"
-"%PY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8130
+echo   êPµôß@‚€Ò•´°¾Í•şÍ£Ö¹·ş„Õ¡£
+echo.
+start "" "%URL%"
+"%PY%" -m uvicorn app.main:app --host 127.0.0.1 --port %PORT%
+echo.
+echo   ·ş„ÕÒÑÍ£Ö¹¡£
+pause
 goto :eof
 
 :nopython
 echo.
-echo [éŒ¯èª¤] æ‰¾ä¸åˆ° Pythonã€‚
-echo   è«‹å®‰è£ Python 3.11 æˆ–ä»¥ä¸Šï¼šhttps://www.python.org/downloads/
-echo   å®‰è£æ™‚è¨˜å¾—å‹¾é¸ "Add python.exe to PATH"ï¼Œè£å®Œå†é›™æ“Šä¸€æ¬¡ã€‚
+echo   [åeÕ`] ÕÒ²»µ½¿ÉÓÃµÄ Python£¨»òÌ“”M­h¾³½¨Á¢Ê§”¡£©¡£
+echo.
+echo   1. µ½ https://www.python.org/downloads/ ÏÂİd Python 3.11 »òÒÔÉÏ
+echo   2. °²Ñb•r¹´ßx "Add python.exe to PATH"
+echo   3. êPµôß@‚€Ò•´°£¬ÔÙëp“ôÒ»´Î start.cmd
+echo.
+echo   Èç¹ûÖ®Ç°½¨ß^‰ÄµôµÄ .venv£¬ÏÈ„hµôß@‚€ÙYÁÏŠAÔÙÖØÔ‡¡£
+echo.
 pause
 goto :eof
 
 :pipfail
 echo.
-echo [éŒ¯èª¤] ä¾è³´å®‰è£å¤±æ•—ï¼ˆé€šå¸¸æ˜¯ç¶²çµ¡ï¼‰ã€‚
-echo   æ‰‹å‹•åŸ·è¡Œï¼š.venv\Scripts\python.exe -m pip install -r requirements.txt
+echo   [åeÕ`] ÒÀÙ‡°²ÑbÊ§”¡£¨Í¨³£ÊÇ¾W½j†–î}£©¡£
+echo   ÊÖ„ÓˆÌĞĞß@Ò»ĞĞÔÙÔ‡£º
+echo     .venv\Scripts\python.exe -m pip install -r requirements.txt
+echo.
 pause
 goto :eof
