@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -231,7 +232,10 @@ def load_prompt(name: str) -> str:
     path = PROMPT_DIR / settings.prompt_variant / ("%s.md" % name)
     if not path.exists():
         path = PROMPT_DIR / "v1" / ("%s.md" % name)
-    return path.read_text(encoding="utf-8") if path.exists() else ""
+    if not path.exists():
+        return ""
+    # v2 的分層標記對模型是噪音，載入時剝掉；要看清單請用 GET /api/v1/prompts
+    return re.sub(r"<!--\s*layer:\s*[a-z]+\s*-->\s*", "", path.read_text(encoding="utf-8"))
 
 
 def prompt_manifest() -> list[dict]:

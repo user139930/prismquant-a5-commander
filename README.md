@@ -6,9 +6,25 @@
 **A5 不是摘要器。** 摘要器回答「發生了什麼」，A5 要回答「這意味著什麼、我該盯什麼、
 什麼情況下我錯了」。這三件事分別由 L0 正規化、L1 交叉驗證、L2 情境推演實現。
 
-- 版本：v0.8.0　提示詞：`v1`　預設大腦：`lens`　實測：一份 LLM 晨報約 20 秒、約 US$0.001
+- 版本：v1.0.0　提示詞：`v2`　預設大腦：`lens`　實測：一份 LLM 晨報約 11–20 秒、約 US$0.001
 - 依賴：FastAPI + httpx + SQLite（全部標準庫或輕量套件，`pip install` 一次搞定）
 - **不需要大模型 key、不需要 A1/A2 在線，也能完整示範**（規則引擎 + 示例資料，頁面會標示）
+
+**v1.0.0：把「五個零件」補上（回應隊友的第二輪意見）**
+
+隊友問的五件事，本質是「有沒有智能體底座」。這一版把五塊都做成**能真跑、能當場驗證**的東西：
+
+| 隊友問的 | 這一版的回答 | 在哪裡看 |
+|---|---|---|
+| 遠端 agent 怎麼通信 | HTTP 交換 JSON 信封 + `trace_id` 貫穿 + SQLite durable log；一次 run 六步可回放 | `/#infra` ①、`app/bus.py` |
+| 記憶怎麼管理 | 三層（工作／情景／語義）+ 同 key 合併 + 顯著性半衰 + 可刪除 + 四權重混合召回 | `/#infra` ②、`app/memory.py` |
+| 工具用到了什麼 | 10 個註冊工具，帶 JSON Schema、權限級別、超時、調用審計；**禁止註冊下單工具** | `/#infra` ③、`app/tools.py` |
+| 提示詞是什麼 | 六層（system/role/task/context/contract/guard）、v1→v2 版本化、可清點、防注入 | `/#infra` ④、`app/promptkit.py` |
+| 有沒有 RAG 向量庫 | 有：107 份文件 / 123 塊（84 來源目錄 + 15 術語 + 歷史晨報），餘弦 + MMR，引用標 `[K1]` | `/#infra` ⑤、`app/rag.py` |
+
+完整推導、技術選型理由與限制見 [`docs/AGENT-INFRA.md`](docs/AGENT-INFRA.md)——那份文件可以直接發給隊友。
+
+晨報頁也多了兩塊附錄：**引用的背景知識**（K1/K2，帶來源連結）與 **記憶延續**（上次的結論與強度）。
 
 **v0.3 新增（接上真實大模型之後做的）**
 
@@ -215,6 +231,7 @@ copy .env.example .env                             # 可選，不設也能跑
 | **單篇探針** | 貼一段新聞即出二次分析；可一鍵載入示例 |
 | **大腦拓撲** | 四拓撲卡片、模型分配圖、取捨對比表、建議；有 key 時可跑 A/B |
 | **運行記錄** | 每一次 run 的輸入、拓撲、提示詞版本、延遲、護欄結果；可重播並比對漂移 |
+| **智能體基建** | 五問自檢：消息流與 trace、三層記憶、工具 schema、提示詞分層、RAG 檢索（可互動） |
 | **合規** | A4 閘門狀態、禁語清單、資料限制、近期攔截 |
 
 介面細節：晨報是雙欄（敘事 + 常駐側欄）；章節編號 `01–07`；置信度用環形表盤；
@@ -251,6 +268,29 @@ copy .env.example .env                             # 可選，不設也能跑
 | POST | `/api/v1/telegram/render` / `send` | 推送預覽 / 實際推送 |
 | POST | `/api/v1/telegram/webhook` | Telegram 指令（`/brief` `/status` `/probe`） |
 
+**v1.0 智能體基建**
+
+| 方法 | 路徑 | 說明 |
+|---|---|---|
+| GET | `/.well-known/agent-card.json` | A2A 能力發現：我是誰、會哪些方法、極限在哪 |
+| POST | `/api/v1/a2a/inbox` | 收件匣：接受 A2A 信封，也接受 JSON-RPC 2.0 |
+| GET | `/api/v1/bus/messages` | 最近訊息（可 `?agent=A1` 過濾） |
+| GET | `/api/v1/bus/trace/{trace_id}` | 一條決策鏈的完整時間線 |
+| POST | `/api/v1/bus/send` | 從介面發一條訊息（測試用） |
+| GET / POST | `/api/v1/memory` | 讀三層記憶 / 寫入一條（同 key 合併） |
+| GET | `/api/v1/memory/search` | 混合召回（詞面 0.45／顯著 0.25／重要 0.20／新鮮 0.10） |
+| DELETE | `/api/v1/memory/{id}` | 忘記（預設軟刪，`?hard=true` 硬刪） |
+| GET | `/api/v1/rag/stats` | 知識庫規模與後端 |
+| GET | `/api/v1/rag/search` | 檢索（`?q=&k=&kind=&mmr=`） |
+| POST | `/api/v1/rag/ingest` | 文本切塊入庫 |
+| POST | `/api/v1/rag/seed` | 重新匯入 84 來源 + 術語 + 最近晨報 |
+| GET | `/api/v1/tools` | 工具目錄；`?openai=1` 直接輸出 function calling schema |
+| POST | `/api/v1/tools/call` | 執行工具（寫審計） |
+| GET | `/api/v1/tools/audit` | 工具調用記錄 |
+| GET | `/api/v1/prompts` | 提示詞清單（版本／層／字數／雜湊） |
+| GET | `/api/v1/prompts/{name}` | 單份提示詞的分層內容 |
+| GET | `/api/v1/arch` | 五問自檢：每項對到代碼位置與當前計數 |
+
 互動文件：<http://127.0.0.1:8130/api/docs>
 
 ---
@@ -272,20 +312,26 @@ copy .env.example .env                             # 可選，不設也能跑
 ```
 app/
   main.py         FastAPI 路由 + 靜態頁
-  commander.py    一次 run 的編排（取數 → 規則 → 大腦 → 護欄 → 留檔）
+  commander.py    一次 run 的編排（取數 → 規則 → 檢索 → 大腦 → 護欄 → 留檔 → 記憶）
   analyze.py      規則層：主題詞典、L0/L1/L2、置信度
   probe.py        單篇新聞探針
   brains.py       四種拓撲 + LLM 呼叫 + 提示詞載入
   connectors.py   A1 / A2 適配與健康檢查
+  bus.py          A2A 消息總線：信封、trace_id、durable log、Agent Card
+  memory.py       三層記憶：寫入去重、顯著性衰減、混合召回、可刪除
+  rag.py          RAG 向量知識庫：切塊、hashed n-gram 向量、餘弦 + MMR
+  tools.py        工具註冊表：JSON Schema、權限、審計、禁止下單
+  promptkit.py    提示詞分層、版本、清點、注入隔離
   guardrails.py   禁語、證據追溯、A4 閘門
   ledger.py       SQLite run ledger + replay
   telegram.py     推送與指令
   evaluate.py     離線評測（提示詞回歸）
-  prompts/v1/     提示詞（版本化）
+  prompts/v1·v2/  提示詞（版本化；v2 為分層模板）
+  seeds/          84 個已核實來源 + 術語表（RAG 種子）
   fixtures/       示例資料
   static/         單頁控制台（HTML/CSS/JS，無建置步驟）
-tests/            28 個單元與 API 測試
-docs/             架構、大腦決策、示範腳本
+tests/            83 個單元與 API 測試（含 34 個基建層）
+docs/             架構、大腦決策、智能體基建、示範腳本
 ```
 
 ---
@@ -326,8 +372,9 @@ docs/             架構、大腦決策、示範腳本
 ## 10. 測試與評測
 
 ```bash
-.venv\Scripts\python -m unittest discover -s tests -v   # 28 tests
+.venv\Scripts\python -m unittest discover -s tests -v   # 83 tests
 .venv\Scripts\python -m app.evaluate                     # 41 項離線驗收，全 PASS 才 exit 0
+.venv\Scripts\python -m unittest tests.test_infra -v    # 只跑基建層（34 項）
 ```
 
 `app.evaluate` 是給「之後要加提示詞訓練」準備的：把「好」寫成硬條件（章節齊全、證據可追溯、
@@ -343,7 +390,12 @@ docs/             架構、大腦決策、示範腳本
 - **單篇探針的方向判斷是詞典法**：接上大模型後會補語氣與上下文；現在的分數只用於排序，不用於決策。
 - **模型吞吐是硬瓶頸**：實測 deepseek 經 OpenRouter 只有 15–20 tok/s，所以 A5 只讓它寫短文。
   若之後要它寫完整章節，得先換到更快的 provider 或加 streaming 輸出。
-- 下一步：A3 執行意圖、A4 風控閘門、排程自動推送（每日 08:30）、提示詞 A/B（`v2`）、英文介面。
+- **RAG 的 local 後端不是神經 embedding**：signed feature hashing + TF-IDF，512 維，
+  對同義詞不敏感，換來確定性可重現。要真 embedding 設 `PQ_EMBED_BACKEND=api`。
+- **消息總線是單機 SQLite**：不是 Kafka。故意如此（clone 即跑），信封格式已把傳輸層抽象掉，
+  規模上去換 Redis Stream 不用改協議。
+- 下一步：A3 執行意圖、A4 風控閘門、讓大模型自己選工具（`tools.specs()` 已就緒）、
+  記憶權重線上學習、英文介面。
 
 ---
 

@@ -30,15 +30,68 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import brains, commander, connectors, guardrails, ledger, scheduler, store, telegram
+from app import (brains, bus, commander, connectors, guardrails, ledger, memory,
+                 promptkit, rag, scheduler, store, telegram, tools)
 from app.config import settings
 
 STATIC = Path(__file__).parent / "static"
 
 
+def _register_bus_methods() -> None:
+    """A5 對外開放的方法。隊友的代理（或 curl）打 /api/v1/a2a/inbox 就是走這裡。
+
+    刻意只開放讀取與生成，不開放任何寫入倉位、修改風控閾值的入口。
+    """
+    bus.register("agent.ping", lambda p: {
+        "pong": True, "agent": "A5", "version": "1.0.0",
+        "prompt": settings.prompt_variant, "topology": settings.brain_topology})
+
+    bus.register("status.get", lambda p: {
+        "upstream": {k: {"ok": v.get("ok"), "latency_ms": v.get("latency_ms")}
+                     for k, v in connectors.health().items()},
+        "rag": rag.stats().get("chunks"),
+        "memory": memory.stats().get("total"),
+    })
+
+    def _news(p: dict) -> dict:
+        events, meta = connectors.a1_events(int(p.get("limit") or settings.upstream_limit_a1))
+        return {"online": bool(meta.get("ok")), "count": len(events),
+                "events": events[: int(p.get("limit") or 10)]}
+
+    def _political(p: dict) -> dict:
+        events, meta = connectors.a2_events(int(p.get("limit") or settings.upstream_limit_a2))
+        return {"online": bool(meta.get("ok")), "degraded": meta.get("degraded"),
+                "count": len(events), "events": events[: int(p.get("limit") or 10)]}
+
+    def _brief(p: dict) -> dict:
+        payload = commander.run(p.get("question") or "生成今天的晨報")
+        return {"run_id": payload.get("run_id"), "headline": payload.get("headline"),
+                "confidence": (payload.get("confidence") or {}).get("score"),
+                "url": "%s/#brief/%s" % (settings.web_base_url.rstrip("/"),
+                                         payload.get("run_id"))}
+
+    bus.register("news.query", _news)
+    bus.register("political.query", _political)
+    bus.register("brief.get", _brief)
+    bus.register("memory.recall", lambda p: memory.recall(
+        p.get("query") or "", k=int(p.get("k") or 5), layer=p.get("layer") or None))
+    bus.register("kb.search", lambda p: rag.search(
+        p.get("query") or "", k=int(p.get("k") or 5), kind=p.get("kind") or None))
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     ledger.init()
+    bus.init()
+    memory.init()
+    rag.init()
+    tools.init()
+    _register_bus_methods()
+    if settings.rag_seed_on_start:
+        try:
+            rag.ensure_seed()
+        except Exception:
+            pass                      # 種子匯入失敗不該讓服務起不來
     scheduler.start()
     try:
         yield
@@ -48,8 +101,9 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.service_name,
-    version="0.8.0",
-    description="PrismQuant A5 指揮官：A1 + A2 匯總、二次分析、大腦拓撲與合規護欄。",
+    version="1.0.0",
+    description="PrismQuant A5 指揮官：A1 + A2 匯總、二次分析、A2A 通信、三層記憶、RAG 知識庫、"
+                "工具註冊表、提示詞分層與合規護欄。",
     docs_url="/api/docs",
     redoc_url=None,
     lifespan=lifespan,
@@ -108,6 +162,35 @@ class RenderRequest(BaseModel):
     payload: dict
 
 
+class MemoryWriteRequest(BaseModel):
+    text: str
+    layer: str = Field(default="episodic", description="episodic / semantic")
+    kind: str = "note"
+    key: str = ""
+    importance: float = 0.6
+
+
+class RagIngestRequest(BaseModel):
+    title: str
+    text: str
+    kind: str = "note"
+    source: str = ""
+    url: str = ""
+
+
+class ToolCallRequest(BaseModel):
+    name: str
+    args: dict = Field(default_factory=dict)
+    trace_id: str = ""
+
+
+class BusSendRequest(BaseModel):
+    recipient: str = "A5"
+    method: str = "agent.ping"
+    payload: dict = Field(default_factory=dict)
+    trace_id: str = ""
+
+
 # ---------------------------------------------------------------- 頁面
 
 @app.get("/", include_in_schema=False)
@@ -130,6 +213,9 @@ def health():
 
 @app.get("/api/v1/meta")
 def meta():
+    bs = bus.stats()
+    ms = memory.stats()
+    rs = rag.stats()
     return {
         "service": settings.service_name,
         "version": app.version,
@@ -140,6 +226,15 @@ def meta():
         "watchlist": settings.watchlist,
         "brief_target_max_minutes": settings.brief_target_max_minutes,
         "prompts": brains.prompt_manifest(),
+        "infra": {
+            "bus": {"messages": bs["messages"], "traces": bs["traces"],
+                    "methods": bs["methods"], "card": "/.well-known/agent-card.json"},
+            "memory": {k: v["count"] for k, v in ms["by_layer"].items()},
+            "rag": {"docs": rs["docs"], "chunks": rs["chunks"],
+                    "backend": rs["embed_backend"]},
+            "tools": tools.catalog()["count"],
+            "self_check": "GET /api/v1/arch",
+        },
         "endpoints": [
             "GET /api/v1/upstream/health",
             "POST /api/v1/commander/run",
@@ -150,6 +245,17 @@ def meta():
             "GET /api/v1/brain",
             "POST /api/v1/brain/compare",
             "GET /api/v1/compliance",
+            "GET /.well-known/agent-card.json",
+            "POST /api/v1/a2a/inbox",
+            "GET /api/v1/bus/messages",
+            "GET /api/v1/bus/trace/{trace_id}",
+            "GET /api/v1/memory",
+            "GET /api/v1/memory/search",
+            "GET /api/v1/rag/search",
+            "GET /api/v1/tools",
+            "POST /api/v1/tools/call",
+            "GET /api/v1/prompts",
+            "GET /api/v1/arch",
         ],
     }
 
@@ -436,6 +542,147 @@ def brain_compare(req: CompareRequest):
             "run_id": payload["run_id"],
         })
     return {"question": req.question, "results": out}
+
+
+# ---------------------------------------------------------------- 智能體基建（v1.0）
+
+@app.get("/.well-known/agent-card.json", include_in_schema=False)
+def agent_card():
+    """A2A 能力發現：隊友的代理先讀這張卡，才知道能叫 A5 做什麼。"""
+    return bus.card()
+
+
+@app.post("/api/v1/a2a/inbox")
+async def a2a_inbox(request: Request):
+    """收件匣。接受 A2A 信封，也接受 JSON-RPC 2.0（curl 順手）。
+
+    隊友用法：
+        curl -X POST http://127.0.0.1:8130/api/v1/a2a/inbox \\
+             -H 'Content-Type: application/json' \\
+             -d '{"jsonrpc":"2.0","id":1,"method":"agent.ping","params":{}}'
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail={
+            "code": "bad_json", "message": "信封必須是合法 JSON"})
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail={
+            "code": "bad_envelope", "message": "信封必須是 JSON 物件"})
+    return bus.handle_incoming(body)
+
+
+@app.get("/api/v1/bus/messages")
+def bus_messages(limit: int = 30, agent: str | None = None):
+    return {"stats": bus.stats(), "messages": bus.messages(limit=limit, agent=agent)}
+
+
+@app.get("/api/v1/bus/trace/{trace_id}")
+def bus_trace(trace_id: str):
+    return bus.trace(trace_id)
+
+
+@app.post("/api/v1/bus/send")
+def bus_send(req: BusSendRequest):
+    msg = bus.request(req.recipient, req.method, req.payload,
+                      trace_id=req.trace_id, sender="user")
+    return msg.model_dump()
+
+
+# ---------------------------------------------------------------- 記憶
+
+@app.get("/api/v1/memory")
+def memory_list(layer: str | None = None, limit: int = 40):
+    return {"stats": memory.stats(), "items": memory.list_items(layer=layer, limit=limit)}
+
+
+@app.get("/api/v1/memory/search")
+def memory_search(q: str = "", k: int = 5, layer: str | None = None):
+    memory.decay()
+    return memory.recall(q, k=k, layer=layer)
+
+
+@app.post("/api/v1/memory")
+def memory_add(req: MemoryWriteRequest):
+    return memory.remember(req.text, layer=req.layer, kind=req.kind, key=req.key,
+                           importance=req.importance)
+
+
+@app.delete("/api/v1/memory/{item_id}")
+def memory_delete(item_id: str, hard: bool = False):
+    if not memory.forget(item_id, hard=hard):
+        raise HTTPException(status_code=404, detail={
+            "code": "not_found", "message": "找不到這條記憶：%s" % item_id})
+    return {"ok": True, "id": item_id, "hard": hard,
+            "note": "硬刪除後不可恢復；軟刪除（archived=2）不再參與檢索"}
+
+
+# ---------------------------------------------------------------- 向量知識庫
+
+@app.get("/api/v1/rag/stats")
+def rag_stats():
+    return rag.stats()
+
+
+@app.get("/api/v1/rag/search")
+def rag_search(q: str, k: int = 5, kind: str | None = None, mmr: bool = True):
+    return rag.search(q, k=k, kind=kind, mmr=mmr)
+
+
+@app.post("/api/v1/rag/ingest")
+def rag_ingest(req: RagIngestRequest):
+    return rag.ingest_document(title=req.title, text=req.text, kind=req.kind,
+                               source=req.source, url=req.url)
+
+
+@app.post("/api/v1/rag/seed")
+def rag_seed(with_briefs: bool = True):
+    seed = rag.ensure_seed()
+    briefs = rag.ingest_latest_briefs(5) if with_briefs else 0
+    return {"seed": seed, "briefs": briefs, "stats": rag.stats()}
+
+
+# ---------------------------------------------------------------- 工具註冊表
+
+@app.get("/api/v1/tools")
+def tools_list(openai: bool = False):
+    return {"catalog": tools.catalog(),
+            "specs": tools.specs(openai=True) if openai else [],
+            "audit": tools.audit_stats(),
+            "recent": tools.audit(10)}
+
+
+@app.post("/api/v1/tools/call")
+def tools_call(req: ToolCallRequest):
+    return tools.call(req.name, req.args, trace_id=req.trace_id)
+
+
+@app.get("/api/v1/tools/audit")
+def tools_audit(limit: int = 30):
+    return {"stats": tools.audit_stats(), "items": tools.audit(limit)}
+
+
+# ---------------------------------------------------------------- 提示詞
+
+@app.get("/api/v1/prompts")
+def prompts_list():
+    return promptkit.manifest()
+
+
+@app.get("/api/v1/prompts/{name}")
+def prompts_show(name: str, ver: str | None = None):
+    d = promptkit.show(name, ver)
+    if not d["raw"]:
+        raise HTTPException(status_code=404, detail={
+            "code": "not_found", "message": "找不到提示詞：%s" % name})
+    return d
+
+
+# ---------------------------------------------------------------- 五問自檢
+
+@app.get("/api/v1/arch")
+def arch():
+    return commander.infra()
 
 
 # ---------------------------------------------------------------- 合規 / Telegram

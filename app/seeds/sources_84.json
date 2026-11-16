@@ -1,0 +1,1040 @@
+[
+ {
+  "n": 1,
+  "name": "Apollo",
+  "type": "金融機構",
+  "url": "https://www.apollo.com/wealth/insights-news/insights/daily-spark",
+  "status": "已核實官網",
+  "tags": [
+   "Apollo"
+  ],
+  "note": "官方 The Daily Spark；截圖對應 Torsten Slok 2026-11-03 文章。",
+  "verify": "https://www.apollo.com/wealth/insights-news/insights/daily-spark/10-percent-nominal-gdp-growth-coming"
+ },
+ {
+  "n": 2,
+  "name": "SEC Form 4",
+  "type": "監管披露",
+  "url": "https://www.sec.gov/submit-filings/forms-index/aboutformsform4",
+  "status": "已核實官網",
+  "tags": [
+   "SEC Form 4"
+  ],
+  "note": "監管申報資料入口；日報及統計屬網站再整理，不代表 SEC 撰寫新聞。",
+  "verify": "https://www.sec.gov/submit-filings/forms-index/aboutformsform4"
+ },
+ {
+  "n": 3,
+  "name": "Haver Analytics",
+  "type": "研究／顧問機構",
+  "url": "https://www.haver.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Haver Analytics"
+  ],
+  "note": "官方宏觀資料與 Economy in Brief 評論。",
+  "verify": "https://www.haver.com/articles/u-s-jolts-labor-demand-improved-in-september"
+ },
+ {
+  "n": 4,
+  "name": "J.P. Morgan",
+  "type": "金融機構",
+  "url": "https://www.jpmorgan.com/insights/research",
+  "status": "已核實官網",
+  "tags": [
+   "J.P. Morgan"
+  ],
+  "note": "J.P. Morgan Global Research 公開研究入口。",
+  "verify": "https://www.jpmorgan.com/insights/research"
+ },
+ {
+  "n": 5,
+  "name": "UBS",
+  "type": "金融機構",
+  "url": "https://www.ubs.com/global/en.html",
+  "status": "已核實官網",
+  "tags": [
+   "UBS",
+   "UBS CIO"
+  ],
+  "note": "包含 UBS CIO；已另核實截圖 US midterms put Congress in play 原文。",
+  "verify": "https://www.ubs.com/global/en.html"
+ },
+ {
+  "n": 6,
+  "name": "HKEX DI",
+  "type": "監管披露",
+  "url": "https://www2.hkexnews.hk/Shareholding-Disclosures/Disclosure-of-Interests?sc_lang=en",
+  "status": "已核實官網",
+  "tags": [
+   "HKEX DI"
+  ],
+  "note": "港交所權益披露入口；日報統計屬再加工。",
+  "verify": "https://www2.hkexnews.hk/Shareholding-Disclosures/Disclosure-of-Interests?sc_lang=en"
+ },
+ {
+  "n": 7,
+  "name": "Serenity",
+  "type": "人物／內容帳號",
+  "url": "https://x.com/aleabitoreddit",
+  "status": "站內明示帳號",
+  "tags": [
+   "Serenity",
+   "Serenity / X"
+  ],
+  "note": "INVESTAT 文章明示 @aleabitoreddit；未獨立完成帳號認證。",
+  "verify": "https://investat.ai/"
+ },
+ {
+  "n": 8,
+  "name": "パウロ（Paul）",
+  "type": "人物／內容帳號",
+  "url": "https://x.com/paurooteri",
+  "status": "站內明示帳號",
+  "tags": [
+   "パウロ (Paul)",
+   "パウロ / X"
+  ],
+  "note": "INVESTAT 文章明示 @paurooteri；未獨立完成帳號認證。",
+  "verify": "https://investat.ai/"
+ },
+ {
+  "n": 9,
+  "name": "FUNDA",
+  "type": "研究／顧問機構",
+  "url": "https://funda.ai/",
+  "status": "已核實官網",
+  "tags": [
+   "FUNDA",
+   "Funda"
+  ],
+  "note": "研究平台與 FUNDA Substack；營運主體由 fundaai.substack.com/tos 確認為 Consensus AI Technology Pte. Ltd.。",
+  "verify": "https://funda.ai/help-center"
+ },
+ {
+  "n": 10,
+  "name": "SemiWiki",
+  "type": "媒體／節目",
+  "url": "https://semiwiki.com/",
+  "status": "已核實官網",
+  "tags": [
+   "SemiWiki"
+  ],
+  "note": "半導體專業媒體與論壇；部分內容轉引 ServeTheHome 等媒體。",
+  "verify": "https://semiwiki.com/"
+ },
+ {
+  "n": 11,
+  "name": "All-In Podcast",
+  "type": "媒體／節目",
+  "url": "https://allin.com/",
+  "status": "已核實官網",
+  "tags": [
+   "All-In Podcast"
+  ],
+  "note": "官網列出 Chamath Palihapitiya、Jason Calacanis、David Sacks、David Friedberg 四位主持人。",
+  "verify": "https://allin.com/"
+ },
+ {
+  "n": 12,
+  "name": "Bloomberg",
+  "type": "媒體／節目",
+  "url": "https://www.bloomberg.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Bloomberg Surveillance",
+   "Ray Dalio（Bloomberg访谈）",
+   "Odd Lots / Bloomberg"
+  ],
+  "note": "出版機構口徑合併 Surveillance、Odd Lots 及 Bloomberg 訪談；節目仍各自獨立。",
+  "verify": "https://bloomberg.com/podcasts/surveillance ; https://bloomberg.com/podcasts/odd_lots"
+ },
+ {
+  "n": 13,
+  "name": "Goldman Sachs",
+  "type": "金融機構",
+  "url": "https://www.goldmansachs.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Goldman Sachs"
+  ],
+  "note": "官方研究、觀點及播客入口。",
+  "verify": "https://www.goldmansachs.com/"
+ },
+ {
+  "n": 14,
+  "name": "Robert Friedland",
+  "type": "人物／內容帳號",
+  "url": "https://www.ivanhoemines.com/events/robert-friedland-at-the-white-house-with-president-donald-trump/",
+  "status": "已核實官網",
+  "tags": [
+   "Robert Friedland",
+   "Robert Friedland / Ivanhoe",
+   "Robert Friedland / X"
+  ],
+  "note": "公司官方人物活動頁，確認其 Ivanhoe Mines 創辦人身分；不是個人官網，個人發言與公司來源須分辨。",
+  "verify": "https://www.ivanhoemines.com/events/robert-friedland-at-the-white-house-with-president-donald-trump/"
+ },
+ {
+  "n": 15,
+  "name": "Damnang",
+  "type": "人物／內容帳號",
+  "url": "https://www.damnang.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Damnang",
+   "Damnang / X"
+  ],
+  "note": "Damnang Research 官方出版物；INVESTAT 另明示 X @damnang2。",
+  "verify": "https://research.damnang.com/ ; https://www.damnang.com/"
+ },
+ {
+  "n": 16,
+  "name": "ZeroHedge",
+  "type": "媒體／節目",
+  "url": "https://www.zerohedge.com/",
+  "status": "已核實官網",
+  "tags": [
+   "zerohedge",
+   "ZeroHedge / Goldman",
+   "zerohedge / X"
+  ],
+  "note": "媒體與聚合平台；ZeroHedge / Goldman 應保留 Goldman 為上游來源。",
+  "verify": "https://www.zerohedge.com/"
+ },
+ {
+  "n": 17,
+  "name": "Jukan",
+  "type": "人物／內容帳號",
+  "url": "https://x.com/jukan05",
+  "status": "站內明示帳號",
+  "tags": [
+   "Jukan",
+   "Jukan / Citrini",
+   "Jukan / X"
+  ],
+  "note": "INVESTAT 文章明示 @jukan05；未獨立完成帳號認證。Citrini 出版物可佐證研究團隊關係，但不等同每篇均由 Citrini 發布。",
+  "verify": "https://investat.ai/"
+ },
+ {
+  "n": 18,
+  "name": "Edward Conard／Macro Roundup",
+  "type": "媒體／節目",
+  "url": "https://www.edwardconard.com/macro-roundup/",
+  "status": "已核實官網",
+  "tags": [
+   "Edward Conard",
+   "Edward Conard Macro Roundup"
+  ],
+  "note": "官方彙編；部分內容標示 AI 摘要並連往原作者，不能將全部觀點當成 Conard 原創。",
+  "verify": "https://www.edwardconard.com/macro-roundup/this-time-would-have-to-be-very-different-part-ii/"
+ },
+ {
+  "n": 19,
+  "name": "Omer Cheema",
+  "type": "人物／內容帳號",
+  "url": "https://cheemaomer.substack.com/",
+  "status": "已核實帳號",
+  "tags": [
+   "Omer Cheema"
+  ],
+  "note": "已對應半導體作者：前 AMD GPU 設計、Samsung、Renesas 背景；避免與同名人士混淆。",
+  "verify": "https://cheemaomer.substack.com/ ; https://seekingalpha.com/author/omer-cheema"
+ },
+ {
+  "n": 20,
+  "name": "Diligent Plane",
+  "type": "人物／內容帳號",
+  "url": "https://x.com/DiligentPlane",
+  "status": "站內明示帳號",
+  "tags": [
+   "Diligent Plane"
+  ],
+  "note": "INVESTAT 文章明示 @DiligentPlane；未獨立完成帳號認證。",
+  "verify": "https://investat.ai/"
+ },
+ {
+  "n": 21,
+  "name": "Morgan Stanley",
+  "type": "金融機構",
+  "url": "https://www.morganstanley.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Morgan Stanley",
+   "摩根士丹利"
+  ],
+  "note": "官方網站；合併中文標籤摩根士丹利。",
+  "verify": "https://www.morganstanley.com/"
+ },
+ {
+  "n": 22,
+  "name": "a16z",
+  "type": "媒體／節目",
+  "url": "https://a16z.com/",
+  "status": "已核實官網",
+  "tags": [
+   "a16z",
+   "a16z / The a16z Show",
+   "a16z Show / OpenAI",
+   "The a16z Show / Reducto"
+  ],
+  "note": "Andreessen Horowitz 官方網站及 Podcast Network；OpenAI、Reducto 等訪談嘉賓不因斜線標籤自動成為獨立發布者。",
+  "verify": "https://a16z.com/"
+ },
+ {
+  "n": 23,
+  "name": "Jim Bianco／Bianco Research",
+  "type": "人物／內容帳號",
+  "url": "https://www.biancoresearch.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Jim Bianco",
+   "Bianco Research"
+  ],
+  "note": "官方列 Jim Bianco 為 President and Macro Strategist；合併屬研究來源群口徑，不代表個人與公司法律等同。",
+  "verify": "https://www.biancoresearch.com/"
+ },
+ {
+  "n": 24,
+  "name": "Peter Berezin",
+  "type": "人物／內容帳號",
+  "url": "https://www.bcaresearch.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Peter Berezin"
+  ],
+  "note": "所屬研究機構官方入口；官網刊載 Peter Berezin 文章，活動文件列 Chief Global Strategist；非個人官網。",
+  "verify": "https://www.bcaresearch.com/ ; https://www.bcaresearch.com/system/files/2025-09/BCA_Conference_Agenda%205.pdf"
+ },
+ {
+  "n": 25,
+  "name": "Barclays",
+  "type": "金融機構",
+  "url": "https://home.barclays/",
+  "status": "已核實官網",
+  "tags": [
+   "Barclays"
+  ],
+  "note": "官方集團網域及年報核實；首頁對文字擷取工具回傳 403。",
+  "verify": "https://home.barclays/content/dam/home-barclays/documents/investor-relations/reports-and-events/annual-reports/2025/Barclays-PLC-Annual-Report-2025.pdf"
+ },
+ {
+  "n": 26,
+  "name": "DoubleLine Capital",
+  "type": "金融機構",
+  "url": "https://doubleline.com/",
+  "status": "已核實官網",
+  "tags": [
+   "DoubleLine Capital"
+  ],
+  "note": "官方投資管理與市場觀點網站。",
+  "verify": "https://doubleline.com/"
+ },
+ {
+  "n": 27,
+  "name": "Gavin Baker",
+  "type": "人物／內容帳號",
+  "url": "https://atreidesmgmt.com/team/gavin-baker/",
+  "status": "已核實官網",
+  "tags": [
+   "Gavin Baker",
+   "Gavin Baker / Atreides"
+  ],
+  "note": "Atreides 官方人物簡介；確認 Managing Partner 與 CIO 職務；非個人官網，個人發言需保留發布渠道。",
+  "verify": "https://atreidesmgmt.com/team/gavin-baker/"
+ },
+ {
+  "n": 28,
+  "name": "IMF",
+  "type": "國際組織",
+  "url": "https://www.imf.org/en/Home",
+  "status": "已核實官網",
+  "tags": [
+   "IMF"
+  ],
+  "note": "國際貨幣基金組織官方網站。",
+  "verify": "https://www.imf.org/en/Home"
+ },
+ {
+  "n": 29,
+  "name": "Jeff Pu",
+  "type": "人物／內容帳號",
+  "url": "待核實",
+  "status": "",
+  "tags": [
+   "Jeff Pu"
+  ],
+  "note": "搜尋找到同名 LinkedIn 個人頁及 GF Securities 招聘資訊；依保守口徑未將其直接認定為站內內容發佈入口。",
+  "verify": "未找到可直接確認且對應站內來源的個人官網。"
+ },
+ {
+  "n": 30,
+  "name": "Fireside Alpha",
+  "type": "媒體／節目",
+  "url": "https://firesidealpha.substack.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Fireside Alpha",
+   "Fireside Alpha / Chamath",
+   "Fireside Alpha / X"
+  ],
+  "note": "官方 About 頁說明其整理商業、科技及投資 Podcast／訪談內容；此連結為自有刊物入口。",
+  "verify": "https://firesidealpha.substack.com/about"
+ },
+ {
+  "n": 31,
+  "name": "Michael Burry／Cassandra Unchained",
+  "type": "人物／內容帳號",
+  "url": "https://michaeljburry.substack.com/",
+  "status": "已核實帳號",
+  "tags": [
+   "Cassandra Unchained / Michael Burry",
+   "Michael Burry"
+  ],
+  "note": "刊物首頁直接標示 Cassandra Unchained 及作者 Michael Burry。",
+  "verify": "https://michaeljburry.substack.com/；https://substack.com/@michaeljburry"
+ },
+ {
+  "n": 32,
+  "name": "SemiAnalysis",
+  "type": "研究／顧問機構",
+  "url": "https://semianalysis.com/",
+  "status": "已核實官網",
+  "tags": [
+   "SemiAnalysis"
+  ],
+  "note": "官方首頁標示 AI 與半導體研究、模型及諮詢，並連到其 Newsletter。",
+  "verify": "https://semianalysis.com/"
+ },
+ {
+  "n": 33,
+  "name": "BlackRock",
+  "type": "金融機構",
+  "url": "https://www.blackrock.com/",
+  "status": "已核實官網",
+  "tags": [
+   "BlackRock"
+  ],
+  "note": "官方全球入口；可能依訪客地區導向不同語言頁面。",
+  "verify": "https://www.blackrock.com/"
+ },
+ {
+  "n": 34,
+  "name": "Deutsche Bank",
+  "type": "金融機構",
+  "url": "https://www.db.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Deutsche Bank",
+   "Deutsche Bank Research"
+  ],
+  "note": "官方首頁提供 Research 連結至 dbresearch.com。",
+  "verify": "https://www.db.com/"
+ },
+ {
+  "n": 35,
+  "name": "Citadel Securities",
+  "type": "金融機構",
+  "url": "https://www.citadelsecurities.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Citadel Securities"
+  ],
+  "note": "官網明示 Citadel Securities；與 Citadel 投資管理業務分開列示。",
+  "verify": "https://www.citadelsecurities.com/"
+ },
+ {
+  "n": 36,
+  "name": "Michael Howell／Capital Wars",
+  "type": "人物／內容帳號",
+  "url": "https://capitalwars.substack.com/",
+  "status": "已核實帳號",
+  "tags": [
+   "Michael Howell",
+   "Capital Wars"
+  ],
+  "note": "Capital Wars 首頁及帳號直接標示作者 Michael Howell。",
+  "verify": "https://capitalwars.substack.com/；https://substack.com/@capitalwars"
+ },
+ {
+  "n": 37,
+  "name": "Citi",
+  "type": "金融機構",
+  "url": "https://www.citigroup.com/global",
+  "status": "已核實官網",
+  "tags": [
+   "Citi"
+  ],
+  "note": "Citi 官方集團入口，設有 Insights 及新聞欄目。",
+  "verify": "https://www.citigroup.com/global"
+ },
+ {
+  "n": 38,
+  "name": "ASML",
+  "type": "企業",
+  "url": "https://www.asml.com/en",
+  "status": "已核實官網",
+  "tags": [
+   "ASML"
+  ],
+  "note": "ASML 官方企業網站。",
+  "verify": "https://www.asml.com/en"
+ },
+ {
+  "n": 39,
+  "name": "Mark Minervini",
+  "type": "人物／內容帳號",
+  "url": "https://www.minervini.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Mark Minervini"
+  ],
+  "note": "Minervini Markets 360／Minervini Private Access 官方入口。",
+  "verify": "https://www.minervini.com/"
+ },
+ {
+  "n": 40,
+  "name": "桥水",
+  "type": "金融機構",
+  "url": "https://www.bridgewater.com/",
+  "status": "已核實官網",
+  "tags": [
+   "桥水"
+  ],
+  "note": "Bridgewater Associates 官方首頁，設 Research & Insights。",
+  "verify": "https://www.bridgewater.com/"
+ },
+ {
+  "n": 41,
+  "name": "PIMCO",
+  "type": "金融機構",
+  "url": "https://www.pimco.com/",
+  "status": "已核實官網",
+  "tags": [
+   "PIMCO"
+  ],
+  "note": "PIMCO 官方全球入口；可能依訪客地區轉向當地語言頁面。",
+  "verify": "https://www.pimco.com/"
+ },
+ {
+  "n": 42,
+  "name": "Quinn政经瞭望",
+  "type": "人物／內容帳號",
+  "url": "待核實",
+  "status": "",
+  "tags": [
+   "Quinn政经瞭望"
+  ],
+  "note": "第三方鏡像出現 quinnoutlook，但未作已核實官方連結。",
+  "verify": "站內目前僅確認來源名稱；搜尋結果只有第三方鏡像，未確認一手帳號頁。"
+ },
+ {
+  "n": 43,
+  "name": "Invest with Uncle Scrooge",
+  "type": "人物／內容帳號",
+  "url": "待核實",
+  "status": "",
+  "tags": [
+   "Invest with Uncle Scrooge"
+  ],
+  "note": "第三方鏡像出現 ScrooogeUncle，但未作已核實官方連結。",
+  "verify": "站內目前僅確認來源名稱；搜尋結果只有第三方鏡像，未確認一手帳號頁。"
+ },
+ {
+  "n": 44,
+  "name": "Boston Consulting Group (BCG)",
+  "type": "研究／顧問機構",
+  "url": "https://www.bcg.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Boston Consulting Group (BCG)"
+  ],
+  "note": "Boston Consulting Group 官方網站。",
+  "verify": "https://www.bcg.com/"
+ },
+ {
+  "n": 45,
+  "name": "Rhodium Group",
+  "type": "研究／顧問機構",
+  "url": "https://rhg.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Rhodium Group"
+  ],
+  "note": "Rhodium Group 官方研究網站，包含中國與能源／氣候研究。",
+  "verify": "https://rhg.com/"
+ },
+ {
+  "n": 46,
+  "name": "Bison Insights",
+  "type": "人物／內容帳號",
+  "url": "https://www.bisoninsights.info/",
+  "status": "已核實官網",
+  "tags": [
+   "Bison Insights"
+  ],
+  "note": "官方刊物首頁顯示作者 Josh Young；About 頁說明油氣投資研究內容。",
+  "verify": "https://www.bisoninsights.info/about"
+ },
+ {
+  "n": 47,
+  "name": "BofA",
+  "type": "金融機構",
+  "url": "https://www.bankofamerica.com/",
+  "status": "已核實官網",
+  "tags": [
+   "BofA Securities",
+   "BofA"
+  ],
+  "note": "Bank of America 官方集團／銀行入口；不是特定 BofA Securities 研究報告直連。",
+  "verify": "https://www.bankofamerica.com/"
+ },
+ {
+  "n": 48,
+  "name": "KKR Global Macro & Asset Allocation",
+  "type": "金融機構",
+  "url": "https://www.kkr.com/insights",
+  "status": "已核實官網",
+  "tags": [
+   "KKR Global Macro & Asset Allocation"
+  ],
+  "note": "KKR 官方研究與觀點入口；宏觀及資產配置內容可由此查閱。",
+  "verify": "https://www.kkr.com/insights"
+ },
+ {
+  "n": 49,
+  "name": "美国能源信息署（U.S. Energy Information Administration，EIA）",
+  "type": "官方數據",
+  "url": "https://www.eia.gov/",
+  "status": "已核實官網",
+  "tags": [
+   "美国能源信息署（U.S. Energy Information Administration，EIA）"
+  ],
+  "note": "美國能源信息署官方政府網站。",
+  "verify": "https://www.eia.gov/"
+ },
+ {
+  "n": 50,
+  "name": "AllianceBernstein",
+  "type": "金融機構",
+  "url": "https://www.alliancebernstein.com/",
+  "status": "已核實官網",
+  "tags": [
+   "AllianceBernstein"
+  ],
+  "note": "AllianceBernstein 官方網站及投資觀點入口。",
+  "verify": "https://www.alliancebernstein.com/"
+ },
+ {
+  "n": 51,
+  "name": "BNY Investment Strategy & Research Group",
+  "type": "金融機構",
+  "url": "https://www.bny.com/corporate/global/en.html",
+  "status": "已核實官網",
+  "tags": [
+   "BNY Investment Strategy & Research Group"
+  ],
+  "note": "BNY 官網發布的 Checkpoints 報告直接列出 Investment Strategy & Research Group；連結使用官方主入口。",
+  "verify": "https://www.bny.com/assets/investments/imemea/pdfs/emea_checkpoints_apr26.pdf"
+ },
+ {
+  "n": 52,
+  "name": "Kuveyt Türk Portfolio",
+  "type": "金融機構",
+  "url": "https://www.kuveytturkportfoy.com.tr/en/",
+  "status": "已核實官網",
+  "tags": [
+   "Kuveyt Türk Portfolio"
+  ],
+  "note": "母銀行官方子公司頁與 Portföy 官網互相印證名稱及資產管理業務。",
+  "verify": "https://www.kuveytturk.com.tr/en/about-us/our-subsidiaries/kuveyt-turk-portfoy；https://www.kuveytturkportfoy.com.tr/en/"
+ },
+ {
+  "n": 53,
+  "name": "KGI Private Wealth",
+  "type": "金融機構",
+  "url": "https://www.kgi.com/en/about-page/kgis",
+  "status": "已核實官網",
+  "tags": [
+   "KGI Private Wealth"
+  ],
+  "note": "已核實 KGI Securities 官方集團介紹，包含財富管理業務；站內 Private Wealth 標籤對應的具體地區／研究欄目尚未定位。",
+  "verify": "https://www.kgi.com/en/about-page/kgis"
+ },
+ {
+  "n": 54,
+  "name": "Allianz Global Investors",
+  "type": "金融機構",
+  "url": "https://www.allianzgi.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Allianz Global Investors"
+  ],
+  "note": "Allianz Global Investors 官方網站，包含投資主題與 House View。",
+  "verify": "https://www.allianzgi.com/"
+ },
+ {
+  "n": 55,
+  "name": "Eastspring Investments",
+  "type": "金融機構",
+  "url": "https://www.eastspring.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Eastspring Investments"
+  ],
+  "note": "Eastspring Investments 官方全球入口，設 Insights 欄目。",
+  "verify": "https://www.eastspring.com/"
+ },
+ {
+  "n": 56,
+  "name": "Cboe",
+  "type": "交易所",
+  "url": "https://www.cboe.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Cboe"
+  ],
+  "note": "Cboe Global Markets 官方網站，包含 Market Intelligence 及市場數據。",
+  "verify": "https://www.cboe.com/"
+ },
+ {
+  "n": 57,
+  "name": "Meta",
+  "type": "企業",
+  "url": "https://investor.atmeta.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Meta"
+  ],
+  "note": "Meta 官方投資者關係入口；Patrick Collison 訪談另列第 84 項。",
+  "verify": "https://investor.atmeta.com/home/default.aspx"
+ },
+ {
+  "n": 58,
+  "name": "台积电",
+  "type": "企業",
+  "url": "https://www.tsmc.com/english",
+  "status": "已核實官網",
+  "tags": [
+   "台积电"
+  ],
+  "note": "台積電官方網站。",
+  "verify": "https://www.tsmc.com/english"
+ },
+ {
+  "n": 59,
+  "name": "野村",
+  "type": "金融機構",
+  "url": "https://www.nomura.com/",
+  "status": "已核實官網",
+  "tags": [
+   "野村"
+  ],
+  "note": "Nomura 官方網站。",
+  "verify": "https://www.nomura.com/"
+ },
+ {
+  "n": 60,
+  "name": "Macro Voices",
+  "type": "媒體／節目",
+  "url": "https://www.macrovoices.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Macro Voices"
+  ],
+  "note": "MacroVoices 官方節目網站，提供 Podcast、逐字稿及研究資料。",
+  "verify": "https://www.macrovoices.com/"
+ },
+ {
+  "n": 61,
+  "name": "国泰海通证券",
+  "type": "金融機構",
+  "url": "https://www.gtht.com/",
+  "status": "已核實官網",
+  "tags": [
+   "国泰海通证券"
+  ],
+  "note": "國泰海通證券現行官方網站。",
+  "verify": "https://www.gtht.com/"
+ },
+ {
+  "n": 62,
+  "name": "Gartner",
+  "type": "研究／顧問機構",
+  "url": "https://www.gartner.com/en",
+  "status": "已核實官網",
+  "tags": [
+   "Gartner"
+  ],
+  "note": "官方頁面已由搜尋索引核實；部分頁面限制自動讀取。",
+  "verify": "https://www.gartner.com/en/about"
+ },
+ {
+  "n": 63,
+  "name": "财报tracker",
+  "type": "人物／內容帳號",
+  "url": "待核實",
+  "status": "",
+  "tags": [
+   "财报tracker"
+  ],
+  "note": "僅有站內來源標籤，未能可靠確認對應網站或帳號。",
+  "verify": "https://investat.ai/"
+ },
+ {
+  "n": 64,
+  "name": "SpaceX",
+  "type": "企業",
+  "url": "https://www.spacex.com/",
+  "status": "已核實官網",
+  "tags": [
+   "SpaceX"
+  ],
+  "note": "SpaceX 官方網站。",
+  "verify": "https://www.spacex.com/company/investors"
+ },
+ {
+  "n": 65,
+  "name": "Citadel / Ken Griffin",
+  "type": "金融機構",
+  "url": "https://www.citadel.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Citadel / Ken Griffin"
+  ],
+  "note": "Citadel 官網明示創辦人 Ken Griffin；與 Citadel Securities 分開。",
+  "verify": "https://www.citadel.com/"
+ },
+ {
+  "n": 66,
+  "name": "NVIDIA / Jensen Huang (GTC Berlin)",
+  "type": "企業",
+  "url": "https://www.nvidia.com/en-us/",
+  "status": "已核實官網",
+  "tags": [
+   "NVIDIA / Jensen Huang (GTC Berlin)"
+  ],
+  "note": "NVIDIA 官方網站；GTC Berlin 為站內原始標籤的活動資訊。",
+  "verify": "https://www.nvidia.com/en-us/"
+ },
+ {
+  "n": 67,
+  "name": "Tesla",
+  "type": "企業",
+  "url": "https://www.tesla.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Tesla"
+  ],
+  "note": "Tesla 官方網站。",
+  "verify": "https://www.tesla.com/"
+ },
+ {
+  "n": 68,
+  "name": "IBM",
+  "type": "企業",
+  "url": "https://www.ibm.com/us-en",
+  "status": "已核實官網",
+  "tags": [
+   "IBM"
+  ],
+  "note": "IBM 官方網站。",
+  "verify": "https://www.ibm.com/us-en"
+ },
+ {
+  "n": 69,
+  "name": "Lam Research",
+  "type": "企業",
+  "url": "https://www.lamresearch.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Lam Research"
+  ],
+  "note": "Lam Research 官方網站。",
+  "verify": "https://www.lamresearch.com/"
+ },
+ {
+  "n": 70,
+  "name": "Chamath Palihapitiya",
+  "type": "人物／內容帳號",
+  "url": "https://www.socialcapital.com/about",
+  "status": "已核實官網",
+  "tags": [
+   "Chamath / Social Capital",
+   "Chamath / X",
+   "Chamath Palihapitiya"
+  ],
+  "note": "Social Capital 官方頁面介紹創辦人 Chamath；此連結為其機構網站，非個人社交動態頁。",
+  "verify": "https://www.socialcapital.com/about"
+ },
+ {
+  "n": 71,
+  "name": "Florian",
+  "type": "人物／內容帳號",
+  "url": "待核實",
+  "status": "",
+  "tags": [
+   "Florian"
+  ],
+  "note": "姓名標籤不足以唯一識別，不推測對應帳號。",
+  "verify": "https://investat.ai/"
+ },
+ {
+  "n": 72,
+  "name": "Wall St Engine",
+  "type": "人物／內容帳號",
+  "url": "https://x.com/wallstengine",
+  "status": "站內明示帳號",
+  "tags": [
+   "Wall St Engine / Texas Instruments",
+   "Wall St Engine / X",
+   "Wall St Engine"
+  ],
+  "note": "INVESTAT 抽查文章明示 @wallstengine；未另外驗證帳號。",
+  "verify": "https://investat.ai/"
+ },
+ {
+  "n": 73,
+  "name": "天风证券",
+  "type": "金融機構",
+  "url": "https://www.tfzq.com/",
+  "status": "已核實官網",
+  "tags": [
+   "天风证券"
+  ],
+  "note": "天風證券官方網站。",
+  "verify": "https://www.tfzq.com/"
+ },
+ {
+  "n": 74,
+  "name": "Bernstein",
+  "type": "金融機構",
+  "url": "https://www.bernsteinresearch.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Bernstein"
+  ],
+  "note": "Bernstein Research 官方研究平台，部分內容需登入。",
+  "verify": "https://www.bernsteinresearch.com/brweb/Public/Login.aspx?ReturnUrl=/brweb/Home.aspx"
+ },
+ {
+  "n": 75,
+  "name": "Seeking Alpha",
+  "type": "媒體／節目",
+  "url": "https://seekingalpha.com/",
+  "status": "已核實官網",
+  "tags": [
+   "Seeking Alpha"
+  ],
+  "note": "Seeking Alpha 官方網站。",
+  "verify": "https://seekingalpha.com/"
+ },
+ {
+  "n": 76,
+  "name": "TS Lombard",
+  "type": "研究／顧問機構",
+  "url": "https://www.tslombard.com/",
+  "status": "已核實官網",
+  "tags": [
+   "TS Lombard"
+  ],
+  "note": "官方研究服務頁連至此主站；本次主站自動讀取回傳 403。",
+  "verify": "https://web.tslombard.com/request-a-free-trial"
+ },
+ {
+  "n": 77,
+  "name": "国信证券",
+  "type": "金融機構",
+  "url": "https://www.guosen.com.cn/",
+  "status": "已核實官網",
+  "tags": [
+   "国信证券"
+  ],
+  "note": "國信證券官方網站。",
+  "verify": "https://www.guosen.com.cn/gs/index.html"
+ },
+ {
+  "n": 78,
+  "name": "McKinsey",
+  "type": "研究／顧問機構",
+  "url": "https://www.mckinsey.com/",
+  "status": "已核實官網",
+  "tags": [
+   "McKinsey"
+  ],
+  "note": "McKinsey & Company 官方網站。",
+  "verify": "https://www.mckinsey.com/"
+ },
+ {
+  "n": 79,
+  "name": "Fraunhofer IPT",
+  "type": "研究／顧問機構",
+  "url": "https://www.ipt.fraunhofer.de/en.html",
+  "status": "已核實官網",
+  "tags": [
+   "Fraunhofer IPT"
+  ],
+  "note": "Fraunhofer Institute for Production Technology IPT 官方網站。",
+  "verify": "https://www.ipt.fraunhofer.de/en.html"
+ },
+ {
+  "n": 80,
+  "name": "PXS Research",
+  "type": "研究／顧問機構",
+  "url": "https://pxsresearch.com/",
+  "status": "已核實官網",
+  "tags": [
+   "PXS Research"
+  ],
+  "note": "PXS Research 官方研究品牌網站；未逐篇核對 INVESTAT 原文鏈。",
+  "verify": "https://pxsresearch.com/"
+ },
+ {
+  "n": 81,
+  "name": "数据要素社",
+  "type": "人物／內容帳號",
+  "url": "待核實",
+  "status": "",
+  "tags": [
+   "数据要素社"
+  ],
+  "note": "搜尋可見同名發布帳號與報告署名，尚未確認唯一官方網站，暫留空。",
+  "verify": "https://investat.ai/"
+ },
+ {
+  "n": 82,
+  "name": "CME Group",
+  "type": "交易所",
+  "url": "https://www.cmegroup.com/",
+  "status": "已核實官網",
+  "tags": [
+   "CME Group"
+  ],
+  "note": "CME Group 官方網站。",
+  "verify": "https://www.cmegroup.com/"
+ },
+ {
+  "n": 83,
+  "name": "Elon Musk",
+  "type": "人物／內容帳號",
+  "url": "https://www.tesla.com/elon-musk",
+  "status": "已核實官網",
+  "tags": [
+   "Elon Musk"
+  ],
+  "note": "Tesla 官網人物介紹頁；此連結不是 Elon Musk 個人發帖頁。",
+  "verify": "https://www.tesla.com/elon-musk"
+ },
+ {
+  "n": 84,
+  "name": "Meta / Patrick Collison访谈",
+  "type": "訪談（待確認）",
+  "url": "待核實",
+  "status": "",
+  "tags": [
+   "Meta / Patrick Collison访谈"
+  ],
+  "note": "原始發布頻道待確認，保守獨立列示。",
+  "verify": "https://investat.ai/"
+ }
+]

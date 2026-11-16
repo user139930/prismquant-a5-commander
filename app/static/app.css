@@ -927,3 +927,65 @@ html[data-theme="light"] .pg-dot{background:var(--line-3)}
 html[data-theme="light"] .empty-mark{color:var(--line-3)}
 html[data-theme="light"] .ev-id{color:var(--chip-ink)}
 html[data-theme="light"] .rec-why li::before{color:var(--accent)}
+
+/* ============ 智能體基建（v1.0） ============ */
+.infra-head{display:flex;align-items:center;gap:11px;margin-bottom:11px}
+.infra-mark{flex:none;width:22px;height:22px;display:grid;place-items:center;
+  font-family:var(--mono);font-size:11px;color:var(--accent);
+  background:var(--accent-weak);border:1px solid var(--line-3);border-radius:6px}
+.infra-en{margin-left:auto;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
+  color:var(--tx-4);text-transform:uppercase}
+.infra-answer{font-size:13px;line-height:1.72;color:var(--tx-2);margin:0 0 14px;max-width:860px}
+.infra-metrics{display:flex;flex-wrap:wrap;gap:26px;padding:13px 0;
+  border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);margin-bottom:14px}
+.infra-kv{display:flex;flex-direction:column;gap:3px;min-width:54px}
+.infra-kv b{font-family:var(--mono);font-size:17px;font-weight:600;letter-spacing:-.02em;color:var(--tx)}
+.infra-kv span{font-size:9.5px;letter-spacing:.06em;color:var(--tx-4)}
+.infra-block{padding:2px 0 4px}
+.infra-sub{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-4);margin-bottom:8px}
+.infra-out{margin-top:12px}
+.infra-where{font-family:var(--mono);font-size:10.5px;color:var(--tx-3);margin-top:6px}
+.infra-where em{font-style:normal;color:var(--accent-2)}
+.infra-pre{margin-top:12px;padding:12px 14px;border-radius:var(--radius-sm);
+  background:var(--sunken-2);border:1px solid var(--line);color:var(--tx-2);
+  font-family:var(--mono);font-size:10.5px;line-height:1.65;max-height:320px;
+  overflow:auto;white-space:pre-wrap;word-break:break-all}
+.pill{display:inline-flex;align-items:center;padding:3px 9px;border-radius:6px;
+  font-family:var(--mono);font-size:10px;color:var(--tx-2);
+  background:var(--pill-bg);border:1px solid var(--line-2);white-space:nowrap}
+.event-row{display:grid;grid-template-columns:58px 116px 168px 104px minmax(0,1fr);gap:10px;
+  align-items:baseline;padding:7px 0;border-bottom:1px solid var(--hairline);font-size:11.5px}
+.event-row:last-of-type{border-bottom:none}
+.event-route{font-family:var(--mono);font-size:10.5px;color:var(--tx-2);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.event-method{font-family:var(--mono);font-size:10.5px;color:var(--accent-2)}
+.st-ok{color:var(--ok-ink);font-size:11px}
+.st-bad{color:var(--up);font-size:11px}
+.tool-row{display:grid;grid-template-columns:150px 1fr 76px 96px;gap:12px;
+  align-items:baseline;padding:9px 0;border-bottom:1px solid var(--hairline);font-size:11.5px;line-height:1.55}
+.tool-row:last-of-type{border-bottom:none}
+.tool-row .hint{display:block;margin-top:2px;font-size:10.5px}
+.rag-hit{padding:10px 0;border-bottom:1px solid var(--hairline)}
+.rag-hit:last-of-type{border-bottom:none}
+.rag-head{display:flex;align-items:baseline;gap:9px;margin-bottom:5px}
+.rag-ref{flex:none;font-family:var(--mono);font-size:9.5px;padding:2px 6px;border-radius:4px;
+  color:var(--accent);background:var(--accent-weak);border:1px solid var(--line-3);text-transform:uppercase}
+.rag-title{font-size:12px;font-weight:500;color:var(--tx);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.rag-score{margin-left:auto;flex:none;font-family:var(--mono);font-size:11px;color:var(--tx-3)}
+.rag-text{font-size:11px;line-height:1.68;color:var(--tx-3)}
+@media (max-width:900px){
+  .event-row{grid-template-columns:52px 1fr 78px}
+  .event-row span:nth-child(4),.event-row span:nth-child(5){display:none}
+  .tool-row{grid-template-columns:1fr 70px}
+  .tool-row span:nth-child(3),.tool-row span:nth-child(4){display:none}
+  .infra-metrics{gap:18px}
+}
+
+/* 晨報附錄：背景知識 / 記憶延續 */
+.kb-list{display:flex;flex-direction:column;gap:2px}
+.kb-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--hairline)}
+.kb-row:last-child{border-bottom:none}
+.kb-body{min-width:0;flex:1}
+.kb-title{font-size:12px;font-weight:500;color:var(--tx);margin-bottom:3px}
+.kb-text{font-size:11px;line-height:1.65;color:var(--tx-3)}

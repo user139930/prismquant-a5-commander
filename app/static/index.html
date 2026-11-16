@@ -55,6 +55,9 @@
       <button class="nav-item" data-view="integration">
         <span class="nav-ico">⧉</span><span>整合狀態</span><em>WIRING</em>
       </button>
+      <button class="nav-item" data-view="infra">
+        <span class="nav-ico">⇄</span><span>智能體基建</span><em>INFRA</em>
+      </button>
       <button class="nav-item" data-view="compliance">
         <span class="nav-ico">⛨</span><span>合規</span><em>GUARD</em>
       </button>
@@ -68,9 +71,9 @@
     </div>
 
     <div class="rail-foot">
-      <span id="railVersion">v0.8.0</span>
+      <span id="railVersion">v1.0.0</span>
       <span class="dot-sep">·</span>
-      <span id="railPrompt">prompt v1</span>
+      <span id="railPrompt">prompt v2</span>
     </div>
   </aside>
 
@@ -289,6 +292,23 @@
           <p>照這個格式做完，A5 只需要改一個環境變數就能接上，不用改程式。</p>
         </div>
         <div id="contractList" class="contract-list"></div>
+      </div>
+    </section>
+
+    <!-- ============ 智能體基建 ============ -->
+    <section class="view" id="view-infra">
+      <div class="section-head">
+        <h2>五個問題，逐條對到代碼</h2>
+        <p>「遠端 agent 怎麼通信、記憶怎麼管、工具用了什麼、提示詞是什麼、有沒有 RAG」——
+           這五件事不是概念題。這一頁不寫「有做」，只給可當場驗證的端點、計數與代碼位置。</p>
+      </div>
+      <div class="stat-row" id="infraStats"></div>
+      <div id="infraCards" class="stack">
+        <div class="empty">
+          <div class="empty-mark">⇄</div>
+          <h3>正在讀取基建狀態</h3>
+          <p>訊息總線、記憶、工具、提示詞、向量庫。</p>
+        </div>
       </div>
     </section>
 

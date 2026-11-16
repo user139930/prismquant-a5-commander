@@ -18,3 +18,6 @@ data/
 .idea/
 .DS_Store
 Thumbs.db
+
+# 本機截圖（示範／除錯用，不進版控）
+.shots/

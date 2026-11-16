@@ -10,6 +10,7 @@ const VIEW_META = {
   brain: ['大腦拓撲', 'BRAIN TOPOLOGY', '同一個大腦，還是不同大腦？'],
   runs: ['歷史記錄', 'HISTORY', '時間軸與重播'],
   integration: ['整合狀態', 'WIRING', '五個代理的接線狀態'],
+  infra: ['智能體基建', 'AGENT INFRA', '五個問題，五個零件'],
   compliance: ['合規', 'GUARDRAILS', '對外說話前的最後一道閘'],
 };
 
@@ -145,6 +146,7 @@ function switchView(view, keepHash) {
   if (view === 'runs') loadRuns();
   if (view === 'compliance') loadCompliance();
   if (view === 'integration') loadIntegration();
+  if (view === 'infra') loadInfra();
 }
 
 /* ---------------------------------------------------------------- 狀態 */
@@ -306,6 +308,36 @@ function renderBrief(p) {
     </div>
     <div class="hint" style="margin-top:8px">${esc(p.disclaimer || '')}</div>`;
 
+  // ---- v1.0：背景知識（RAG）與記憶延續 ----
+  const kindLabel = k => ({ source: '來源目錄', glossary: '術語', brief: '歷史晨報',
+                            note: '筆記' }[k] || k || '—');
+  const ret = p.retrieval || {};
+  const kbHits = ret.hits || [];
+  const kbBlock = kbHits.length ? secBlock('K', '引用的背景知識', 'KNOWLEDGE BASE',
+    `<div class="kb-list">${kbHits.map(h => `<div class="kb-row">
+        <span class="rag-ref">${esc(h.ref)}</span>
+        <div class="kb-body">
+          <div class="kb-title">${esc(h.title)}</div>
+          <div class="kb-text">${esc((h.text || '').slice(0, 150))}</div>
+        </div>
+        <span class="tag tag-flat">${esc(kindLabel(h.kind))}</span>
+      </div>`).join('')}</div>
+      <div class="hint" style="margin-top:10px">
+        檢索後端 ${esc(ret.backend || '—')}　·　${kbHits.length} 塊　·　引用格式 [K1]，與當期事實（N1）分開標注
+      </div>`) : '';
+
+  const rec = p.recall || {};
+  const memHits = rec.hits || [];
+  const memBlock = memHits.length ? secBlock('M', '記憶延續', 'MEMORY',
+    `<div class="kb-list">${memHits.map(h => `<div class="kb-row">
+        <span class="rag-ref">${esc(h.layer === 'semantic' ? '語義' : '情景')}</span>
+        <div class="kb-body"><div class="kb-text">${esc(h.text)}</div></div>
+        <span class="mono" style="font-size:10px;color:var(--tx-4)">${(h.score || 0).toFixed(2)}</span>
+      </div>`).join('')}</div>
+      <div class="hint" style="margin-top:10px">
+        這些是上次留下的結論與你的關注詞；只有與本期不同時，正文才會寫「與上次相比」
+      </div>`) : '';
+
   const cov = p.coverage || {};
   const covChips = (cov.agents || []).map(a => {
     const cls = a.present ? 'ok' : (a.status === 'empty' ? 'warn' : 'missing');
@@ -396,6 +428,8 @@ function renderBrief(p) {
       </aside>
     </div>
     ${secBlock(conflictBlocks ? '07' : '06', '證據鏈', 'EVIDENCE', `<div class="ev-list">${evRows || '<div class="hint">（無）</div>'}</div>`)}
+    ${kbBlock}
+    ${memBlock}
     ${secBlock('G', '合規與風險聲明', 'GUARDRAIL', guardInner)}
     <details class="raw-box">
       <summary>原始資料（給驗收與除錯用）</summary>
@@ -1566,3 +1600,253 @@ window.addEventListener('hashchange', () => {
 });
 
 document.addEventListener('DOMContentLoaded', init);
+
+/* ---------------------------------------------------------------- 智能體基建
+   隊友問的五件事，逐條對到代碼與端點。原則：只放可驗證的東西——端點、計數、代碼位置。 */
+
+const INFRA_CARDS = [
+  { id: 'comms', mark: '①', en: 'AGENT-TO-AGENT', title: '遠端 agent 怎麼通信' },
+  { id: 'memory', mark: '②', en: 'MEMORY', title: '記憶怎麼管理' },
+  { id: 'tools', mark: '③', en: 'TOOLS', title: '工具用到了什麼' },
+  { id: 'prompts', mark: '④', en: 'PROMPTS', title: '提示詞是什麼' },
+  { id: 'rag', mark: '⑤', en: 'RETRIEVAL', title: '有沒有 RAG 向量庫' },
+];
+
+function infraMetrics(metrics) {
+  const rows = Object.entries(metrics || {}).map(([k, v]) =>
+    `<div class="infra-kv"><b>${esc(v)}</b><span>${esc(k)}</span></div>`).join('');
+  return `<div class="infra-metrics">${rows || '<span class="hint">—</span>'}</div>`;
+}
+
+function infraFoot(item) {
+  const eps = (item.endpoints || []).map(e => `<span class="pill">${esc(e)}</span>`).join('');
+  return `<div class="infra-where">實作 <em>${esc(item.where || '')}</em></div>
+    ${item.note ? `<div class="hint" style="margin-bottom:10px">${esc(item.note)}</div>` : ''}
+    <div class="pill-row">${eps}</div>`;
+}
+
+function infraShell(card, item, body) {
+  return `<div class="card infra-card" id="infra-${card.id}">
+    <div class="infra-head">
+      <span class="infra-mark">${card.mark}</span>
+      <h3>${esc(card.title)}</h3>
+      <span class="infra-en">${esc(card.en)}</span>
+    </div>
+    <p class="infra-answer">${esc((item && item.short) || '讀取中…')}</p>
+    ${infraMetrics(item && item.metrics)}
+    ${body || ''}
+    ${infraFoot(item || {})}
+  </div>`;
+}
+
+function renderInfra(arch, busData, mem, tl, pr, rs) {
+  const byId = {};
+  ((arch && arch.items) || []).forEach(i => { byId[i.id] = i; });
+
+  const msgs = (busData && busData.messages) || [];
+  const bs = (busData && busData.stats) || {};
+  $('#infraStats').innerHTML = [
+    ['訊息', bs.messages ?? '—'], ['決策鏈', bs.traces ?? '—'],
+    ['記憶', (mem && mem.stats && mem.stats.total) ?? '—'],
+    ['知識庫', (rs && rs.chunks) ?? '—'],
+    ['工具', (tl && tl.catalog && tl.catalog.count) ?? '—'],
+    ['提示詞', (pr && pr.variant) ?? '—'],
+  ].map(([k, v]) => `<div class="stat-tile"><span class="st-name">${esc(k)}</span><span class="st-val">${esc(v)}</span></div>`).join('');
+
+  /* ① 通信 */
+  const msgRows = msgs.length ? msgs.map(m => `<div class="event-row">
+      <span class="mono" style="color:var(--tx-4)">${esc((m.created_at || '').slice(11, 19))}</span>
+      <span class="event-route">${esc(m.sender)} → ${esc(m.recipient)}</span>
+      <span class="event-method">${esc(m.method)}</span>
+      <span class="${m.status === 'ok' ? 'st-ok' : 'st-bad'}">${esc(m.status)}${m.latency_ms ? ' · ' + m.latency_ms + 'ms' : ''}</span>
+      <span class="mono" style="color:var(--tx-4);font-size:10px">${esc((m.trace_id || '').slice(-10))}</span>
+    </div>`).join('')
+    : '<div class="hint">還沒有訊息。按下右下角的「發一條測試」就會出現。</div>';
+
+  const commsBody = `<div class="infra-block">
+      <div class="infra-sub">最近的訊息（每條都帶 trace_id）</div>
+      ${msgRows}
+      <div class="ask-row" style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" id="btnBusPing">發一條 agent.ping</button>
+        <button class="btn btn-ghost btn-sm" id="btnBusCard">看 Agent Card</button>
+        <span class="hint" id="busHint">接收端 = A5 自己；也可以 POST /api/v1/a2a/inbox</span>
+      </div>
+      <pre class="infra-pre" id="busCardOut" hidden></pre>
+    </div>`;
+
+  /* ② 記憶 */
+  const layers = (mem && mem.stats && mem.stats.layers) || {};
+  const layerCounts = ((mem && mem.stats && mem.stats.by_layer) || {});
+  const layerRows = Object.keys(layers).map(k => `<div class="tool-row">
+      <span class="mono">${esc(layers[k].en)}</span>
+      <span>${esc(layers[k].label)}<span class="hint">　${esc(layers[k].desc)}</span></span>
+      <span class="mono">${esc(layerCounts[k] ? layerCounts[k].count : 0)}</span>
+      <span class="hint">${esc(layers[k].ttl)}</span>
+    </div>`).join('');
+
+  const memBody = `<div class="infra-block">
+      ${layerRows}
+      <div class="ask-row" style="margin-top:12px">
+        <input id="memQ" class="input" placeholder="試試：關稅、上次晨報、我的關注">
+        <button class="btn btn-ghost btn-sm" id="btnMemSearch">召回</button>
+      </div>
+      <div id="memOut" class="infra-out"></div>
+    </div>`;
+
+  /* ③ 工具 */
+  const tools = (tl && tl.catalog && tl.catalog.tools) || [];
+  const toolRows = tools.map(t => `<div class="tool-row">
+      <span class="mono" style="color:var(--accent-2)">${esc(t.name)}</span>
+      <span>${esc(t.title)}<span class="hint">　${esc(t.description)}</span></span>
+      <span class="tag tag-flat">${esc(t.permission)}</span>
+      <span class="hint">${t.params.length} 參數</span>
+    </div>`).join('');
+
+  const toolsBody = `<div class="infra-block">
+      ${toolRows || '<div class="hint">工具層未載入</div>'}
+      <div class="ask-row" style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" id="btnToolSchema">看 OpenAI function schema</button>
+        <span class="hint">可整包餵給模型讓它自己選工具</span>
+      </div>
+      <pre class="infra-pre" id="toolSchemaOut" hidden></pre>
+    </div>`;
+
+  /* ④ 提示詞 */
+  const pitems = (pr && pr.items) || [];
+  const promptRows = pitems.map(p => `<div class="tool-row">
+      <span class="mono">${esc(p.name)}</span>
+      <span>${p.layers.map(l => `<span class="tag tag-flat">${esc(l)}</span>`).join(' ')}</span>
+      <span class="mono">${p.words} 字</span>
+      <span class="hint">v${esc(p.version)}${p.active ? ' · 生效' : ''} · ${esc(p.hash)}</span>
+    </div>`).join('');
+
+  const promptsBody = `<div class="infra-block">
+      ${promptRows || '<div class="hint">找不到提示詞</div>'}
+      <div class="ask-row" style="margin-top:12px">
+        <input id="promptName" class="input" placeholder="brief_user" value="brief_user">
+        <button class="btn btn-ghost btn-sm" id="btnPromptShow">看分層內容</button>
+      </div>
+      <div id="promptOut" class="infra-out"></div>
+    </div>`;
+
+  /* ⑤ RAG */
+  const ragBody = `<div class="infra-block">
+      <div class="ask-row">
+        <input id="ragQ" class="input" placeholder="試試：關稅要去哪找、傳導矩陣是什麼">
+        <button class="btn btn-ghost btn-sm" id="btnRagSearch">檢索</button>
+      </div>
+      <div id="ragOut" class="infra-out"></div>
+    </div>`;
+
+  $('#infraCards').innerHTML = [
+    infraShell(INFRA_CARDS[0], byId.comms, commsBody),
+    infraShell(INFRA_CARDS[1], byId.memory, memBody),
+    infraShell(INFRA_CARDS[2], byId.tools, toolsBody),
+    infraShell(INFRA_CARDS[3], byId.prompts, promptsBody),
+    infraShell(INFRA_CARDS[4], byId.rag, ragBody),
+  ].join('');
+
+  bindInfra();
+}
+
+function bindInfra() {
+  const ping = $('#btnBusPing');
+  if (ping) ping.onclick = async () => {
+    ping.disabled = true;
+    try {
+      const r = await api('/api/v1/bus/send', {
+        method: 'POST',
+        body: JSON.stringify({ recipient: 'A5', method: 'agent.ping', payload: {} }),
+      });
+      toast(r.status === 'ok' ? '收到 pong，延遲 ' + r.latency_ms + 'ms' : '失敗：' + (r.error || ''), r.status !== 'ok');
+      loadInfra();
+    } catch (e) { toast(e.message, true); }
+    finally { ping.disabled = false; }
+  };
+
+  const card = $('#btnBusCard');
+  if (card) card.onclick = async () => {
+    const out = $('#busCardOut');
+    out.hidden = !out.hidden;
+    if (out.hidden) return;
+    try { out.textContent = JSON.stringify(await api('/.well-known/agent-card.json'), null, 2); }
+    catch (e) { out.textContent = e.message; }
+  };
+
+  const ms = $('#btnMemSearch');
+  if (ms) ms.onclick = async () => {
+    const q = $('#memQ').value.trim();
+    const out = $('#memOut');
+    out.innerHTML = '<div class="hint">召回中…</div>';
+    try {
+      const r = await api('/api/v1/memory/search?k=5&q=' + encodeURIComponent(q));
+      out.innerHTML = r.hits.length ? r.hits.map(h => `<div class="rag-hit">
+          <div class="rag-head">
+            <span class="rag-ref">${esc(h.layer)}</span>
+            <span class="rag-title">${esc(h.text.slice(0, 90))}</span>
+            <span class="rag-score">${h.score.toFixed(3)}</span>
+          </div>
+          <div class="rag-text">詞面 ${h.lexical} · 顯著 ${h.salience} · 重要 ${h.importance} · 命中 ${h.hits} 次</div>
+        </div>`).join('') : '<div class="hint">沒有命中。記憶會隨著每次晨報累積。</div>';
+    } catch (e) { out.innerHTML = `<div class="hint">${esc(e.message)}</div>`; }
+  };
+
+  const ts = $('#btnToolSchema');
+  if (ts) ts.onclick = async () => {
+    const out = $('#toolSchemaOut');
+    out.hidden = !out.hidden;
+    if (out.hidden) return;
+    try {
+      const r = await api('/api/v1/tools?openai=1');
+      out.textContent = JSON.stringify(r.specs, null, 2);
+    } catch (e) { out.textContent = e.message; }
+  };
+
+  const ps = $('#btnPromptShow');
+  if (ps) ps.onclick = async () => {
+    const name = ($('#promptName').value || '').trim() || 'brief_user';
+    const out = $('#promptOut');
+    out.innerHTML = '<div class="hint">讀取中…</div>';
+    try {
+      const r = await api('/api/v1/prompts/' + encodeURIComponent(name));
+      out.innerHTML = r.layers.map(l => `<div class="rag-hit">
+          <div class="rag-head"><span class="rag-ref">${esc(l.layer)}</span>
+            <span class="rag-title">${esc(l.label)}</span>
+            <span class="rag-score">${l.words} 字</span></div>
+          <div class="rag-text" style="max-height:none;white-space:pre-wrap">${esc(l.text.slice(0, 420))}</div>
+        </div>`).join('') + `<div class="hint">變數：${esc((r.vars || []).join('、') || '無')}　·　hash ${esc(r.hash)}</div>`;
+    } catch (e) { out.innerHTML = `<div class="hint">${esc(e.message)}</div>`; }
+  };
+
+  const rs = $('#btnRagSearch');
+  if (rs) rs.onclick = async () => {
+    const q = $('#ragQ').value.trim();
+    if (!q) return toast('先輸入一個問題', true);
+    const out = $('#ragOut');
+    out.innerHTML = '<div class="hint">檢索中…</div>';
+    try {
+      const r = await api('/api/v1/rag/search?k=4&q=' + encodeURIComponent(q));
+      out.innerHTML = r.hits.length ? r.hits.map(h => `<div class="rag-hit">
+          <div class="rag-head">
+            <span class="rag-ref">${esc(h.ref)}</span>
+            <span class="rag-title">${esc(h.title)}</span>
+            <span class="rag-score">${h.score.toFixed(3)}</span>
+          </div>
+          <div class="rag-text">${esc(h.text.slice(0, 150))}</div>
+        </div>`).join('') : '<div class="hint">沒有命中</div>';
+    } catch (e) { out.innerHTML = `<div class="hint">${esc(e.message)}</div>`; }
+  };
+}
+
+async function loadInfra() {
+  const safe = p => p.catch(() => null);
+  const [arch, busData, mem, tl, pr, rs] = await Promise.all([
+    safe(api('/api/v1/arch')),
+    safe(api('/api/v1/bus/messages?limit=12')),
+    safe(api('/api/v1/memory?limit=8')),
+    safe(api('/api/v1/tools')),
+    safe(api('/api/v1/prompts')),
+    safe(api('/api/v1/rag/stats')),
+  ]);
+  renderInfra(arch, busData, mem, tl, pr, rs);
+}

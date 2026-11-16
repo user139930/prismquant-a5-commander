@@ -11,6 +11,11 @@ from pathlib import Path
 os.environ.setdefault("PQ_UPSTREAM_TIMEOUT", "0.8")
 os.environ.setdefault("PQ_LEDGER_PATH", "data/test_ledger.db")  # 測試不要污染示範用的歷史記錄
 os.environ.setdefault("PQ_PREFS_PATH", "data/test_prefs.json")  # 也不要覆寫使用者存過的 key
+# v1.0：基建層也要用測試庫，否則跑一次測試就把示範用的消息／記憶洗掉
+os.environ.setdefault("PQ_BUS_PATH", "data/test_bus.db")
+os.environ.setdefault("PQ_MEMORY_PATH", "data/test_memory.db")
+os.environ.setdefault("PQ_RAG_PATH", "data/test_rag.db")
+os.environ.setdefault("PQ_TOOL_PATH", "data/test_tools.db")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 

@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     price_out_per_m: float = 1.10
 
     # ---------- 提示詞版本（之後要「訓練提示詞」就從這裡擴） ----------
-    prompt_variant: str = "v1"
+    prompt_variant: str = "v2"
 
     # ---------- 合規護欄 ----------
     a4_gate: str = "advisory_only"        # advisory_only | risk_checked
@@ -93,7 +93,23 @@ class Settings(BaseSettings):
     # ---------- 儲存 ----------
     ledger_path: str = "data/a5_ledger.db"
     prefs_path: str = "data/prefs.json"   # 使用者設定（關注詞、大模型 key），已被 gitignore
+    bus_path: str = "data/a5_bus.db"      # A2A 訊息日誌（durable log）
+    memory_path: str = "data/a5_memory.db"  # 三層記憶
+    rag_path: str = "data/a5_rag.db"      # 向量索引
+    tool_path: str = "data/a5_tools.db"   # 工具調用審計
     brief_target_max_minutes: int = 10
+
+    # ---------- RAG 向量知識庫 ----------
+    # local : signed feature hashing + TF-IDF，純標準庫、確定性、零下載
+    # api   : 呼叫 OpenAI 兼容 /embeddings（真 embedding），失敗自動回退 local
+    embed_backend: str = "local"
+    embed_model: str = "text-embedding-3-small"
+    rag_top_k: int = 5
+    rag_seed_on_start: bool = True
+
+    # ---------- 記憶 ----------
+    memory_half_life_days: float = 14.0   # 顯著性半衰期：兩週後權重減半
+    memory_recall_k: int = 5
 
     @field_validator("brain_topology")
     @classmethod
@@ -116,6 +132,26 @@ class Settings(BaseSettings):
     def prefs_file(self) -> Path:
         p = Path(self.prefs_path)
         return p if p.is_absolute() else PROJECT_ROOT / p
+
+    def _resolve(self, raw: str) -> Path:
+        p = Path(raw)
+        return p if p.is_absolute() else PROJECT_ROOT / p
+
+    @property
+    def bus_file(self) -> Path:
+        return self._resolve(self.bus_path)
+
+    @property
+    def memory_file(self) -> Path:
+        return self._resolve(self.memory_path)
+
+    @property
+    def rag_file(self) -> Path:
+        return self._resolve(self.rag_path)
+
+    @property
+    def tool_file(self) -> Path:
+        return self._resolve(self.tool_path)
 
 
 settings = Settings()

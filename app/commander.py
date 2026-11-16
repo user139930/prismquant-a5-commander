@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import time
 
-from app import analyze, brains, connectors, guardrails, ledger, store, probe as probe_mod
+from app import (analyze, brains, bus, connectors, guardrails, ledger, memory,
+                 promptkit, rag, store, probe as probe_mod)
 from app.config import settings
 
 
@@ -92,6 +93,59 @@ def _facts(payload: dict) -> str:
             quality.get("newest_age_hours") or -1),
         "draft": _draft_text(payload),
     }
+
+
+def _retrieve(question: str, focus: str, payload: dict, k: int = 4) -> dict:
+    """RAG 檢索：把今天的主題拿去知識庫找背景（來源目錄、術語、歷史晨報）。
+
+    刻意分兩路：主題檢索取 3 塊，再強制取 1 塊「來源目錄」——
+    否則檢索結果永遠是歷史晨報（它們跟主題最像），「該去哪找」這個問題就答不出來。
+
+    失敗只影響「有沒有背景可引」，不影響晨報本身——降級不是靜默，note 會寫明。
+    """
+    try:
+        topics = " ".join([c.get("label", "") for c in payload.get("clusters", [])[:3]])
+        q = " ".join(x for x in (focus, topics, question) if x).strip() or "宏觀 政策 風險"
+        main = rag.search(q, k=max(1, k - 1), mmr=True)
+        picked = list(main["hits"])
+        try:
+            src = rag.search(q, k=1, kind="source")
+            picked += [h for h in src["hits"] if h["doc_id"] not in {x["doc_id"] for x in picked}]
+        except Exception:
+            pass
+        picked = sorted(picked, key=lambda h: -h["score"])[:k + 1]
+        hits = [{
+            "ref": "K%d" % i, "score": h["score"], "title": h["title"], "text": h["text"],
+            "kind": h["kind"], "url": h["url"], "chunk_idx": h["chunk_idx"],
+            "doc_id": h["doc_id"],
+        } for i, h in enumerate(picked, 1)]
+        return {"query": main["query"], "backend": main["backend"], "hits": hits,
+                "indexed": main.get("indexed", 0)}
+    except Exception as exc:
+        return {"query": "", "backend": "unavailable", "hits": [],
+                "note": "知識庫不可用：%s" % str(exc)[:120]}
+
+
+def _kb_block(hits: list[dict]) -> str:
+    if not hits:
+        return promptkit.fence("KNOWLEDGE", "（本次沒有檢索到相關背景，不要假裝有）")
+    lines = ["%s｜%s｜%s" % (h["ref"], h["title"], (h["text"] or "")[:170]) for h in hits]
+    return promptkit.fence("KNOWLEDGE 背景知識（引用時用 [K1]）", "\n".join(lines))
+
+
+def _memory_block(question: str) -> tuple[str, dict]:
+    """把「上次怎麼說」壓成幾行。只有真的不同才值得提，所以只取高顯著性的幾條。"""
+    try:
+        r = memory.recall(question, k=3, include_archived=False)
+        rows = [h for h in r["hits"] if h["layer"] in ("episodic", "semantic")]
+        if not rows:
+            return promptkit.fence("MEMORY", "（沒有可用的歷史記憶，這是第一次）"), {"hits": []}
+        lines = ["%s｜%s｜%s" % (h["last_hit"][:10], h["layer"], h["text"]) for h in rows]
+        return promptkit.fence("MEMORY 上次的結論（只在變化時才提）", "\n".join(lines)), {
+            "hits": [{"id": h["id"], "layer": h["layer"], "text": h["text"],
+                      "score": h["score"]} for h in rows]}
+    except Exception as exc:
+        return promptkit.fence("MEMORY", "（記憶層不可用：%s）" % str(exc)[:80]), {"hits": []}
 
 
 def _draft_text(payload: dict) -> str:
@@ -240,9 +294,23 @@ def chat_payload(question: str, intent: str, reply: str | None = None,
 
 # ---------------------------------------------------------------- 主流程
 
+
+def _note(trace_id: str, method: str, status: str = "ok", recipient: str = "A5",
+          payload: dict | None = None, latency_ms: int = 0, type_: str = "event") -> None:
+    """把一步寫進總線日誌。寫不進去不該影響晨報，所以吞掉異常。"""
+    try:
+        bus.send(bus.AgentMessage(trace_id=trace_id, sender="A5", recipient=recipient,
+                                  method=method, type=type_, status=status,
+                                  payload=payload or {}, latency_ms=latency_ms))
+    except Exception:
+        pass
+
+
 def run(question: str = "", topology: str | None = None, progress=None) -> dict:
     started = time.time()
     q = (question or "").strip() or "生成今天的晨報"
+    trace_id = bus.new_trace_id("run")
+    _note(trace_id, "brief.started", payload={"question": q})
 
     def emit(stage: str, message: str, **extra):
         if progress:
@@ -289,6 +357,13 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
              "已連線" if a1_online else "未連線", len(a1),
              "已連線" if a2_online else "未連線", len(a2)),
          done=True, upstream={"a1": a1_online, "a2": a2_online})
+    _note(trace_id, "news.query", status="ok" if a1_online else "failed", recipient="A1",
+          payload={"count": len(a1), "transport": "http-pull",
+                   "endpoint": settings.a1_api_url}, latency_ms=a1_meta.get("latency_ms") or 0)
+    _note(trace_id, "political.query", status="ok" if a2_online else "failed", recipient="A2",
+          payload={"count": len(a2), "transport": "http-pull",
+                   "endpoint": settings.a2_api_url}, latency_ms=a2_meta.get("latency_ms") or 0)
+
     if a1_online and a2_online:
         # 在線但沒有資料 ≠ 離線：前者要老實留空，後者才用示例
         sample_mode = bool(a1_meta.get("sampled") or a2_meta.get("sampled"))
@@ -314,10 +389,25 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
     payload = analyze.build_brief(q, a1, a2, sample_mode, store.get_watchlist(),
                                   upstream_meta, focus=focus)
     payload["focus"] = focus
+    payload["trace_id"] = trace_id
     emit("analyze",
          "L0 正規化 → L1 交叉驗證（%d 個主題 / %d 組分歧）→ L2 情境推演" % (
              len(payload.get("clusters", [])), len(payload.get("conflicts", []))),
          done=True)
+
+    # 記憶與知識庫：兩者都失敗也不影響晨報，只是少了背景與延續性
+    emit("retrieve", "檢索知識庫與歷史記憶")
+    payload["retrieval"] = _retrieve(q, focus, payload)
+    mem_block, recall_meta = _memory_block(
+        " ".join([q, focus] + [c.get("label", "") for c in payload.get("clusters", [])[:3]]))
+    payload["recall"] = recall_meta
+    _note(trace_id, "kb.retrieved", payload={
+        "backend": payload["retrieval"].get("backend"),
+        "hits": len(payload["retrieval"].get("hits") or []),
+        "memory_hits": len(recall_meta.get("hits") or [])})
+    emit("retrieve", "背景 %d 塊／記憶 %d 條" % (
+        len(payload["retrieval"].get("hits") or []), len(recall_meta.get("hits") or [])),
+        done=True)
 
     brain_plan = brains.plan(topology or settings.brain_topology)
     mode = "rule"
@@ -330,7 +420,19 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
             role = brain_plan.role("a5")
             system = brains.load_prompt("brief_system") or "你是 PrismQuant 的指揮官 A5。"
             template = brains.load_prompt("brief_user")
-            user = template.format(**_facts(payload))
+            ctx = _facts(payload)
+            if promptkit.vars_of(template):
+                # v2：分層模板用 {{佔位符}}，上下文層由 promptkit 拼裝並做注入隔離
+                ctx["memory"] = mem_block
+                ctx["kb"] = _kb_block(payload["retrieval"].get("hits") or [])
+                user = promptkit.render_text(template, ctx)
+            else:
+                try:
+                    user = template.format(**ctx)
+                except (KeyError, IndexError, ValueError) as exc:
+                    # 模板與事實不匹配時，寧可送未填充的模板，也不要整份晨報失敗
+                    user = template
+                    degrade = "提示詞填充失敗（%s），已使用未填充模板" % str(exc)[:80]
             result, llm_meta = brains.chat_json(system, user, role,
                                                 max_tokens=settings.llm_max_tokens)
             good = _validate_llm(result)
@@ -338,6 +440,9 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
             payload["brief_text"] = good["brief"]
             payload["reading_minutes"] = analyze.reading_minutes(payload["sections"], good["brief"])
             mode = "llm"
+            _note(trace_id, "llm.drafted", payload={
+                "model": role.model, "mode": "llm",
+                "tokens": llm_meta.get("total_tokens") or 0})
             emit("llm", "完成（%d 字）" % len(good["brief"]),
                  done=True, tokens=(llm_meta.get("completion_tokens") or 0))
         except brains.LLMError as exc:
@@ -373,6 +478,10 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
 
     emit("guard", "合規檢查：禁語掃描、證據可追溯、A4 閘門")
     payload = guardrails.apply(payload)
+    _note(trace_id, "guard.passed" if (payload.get("guard") or {}).get("passed") else "guard.blocked",
+          status="ok" if (payload.get("guard") or {}).get("passed") else "failed",
+          payload={"banned": len((payload.get("guard") or {}).get("hits") or []),
+                   "a4_gate": settings.a4_gate})
 
     prompt_tokens = llm_meta.get("prompt_tokens") or 0
     completion_tokens = llm_meta.get("completion_tokens") or 0
@@ -397,6 +506,24 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
         "question": q, "topology": brain_plan.topology, "a1": a1, "a2": a2,
         "sample_mode": sample_mode,
     })
+
+    # 記憶寫入 + 事件廣播：失敗只記錄，不讓一份已完成的晨報消失
+    try:
+        payload["memory_write"] = memory.absorb_brief(payload)
+    except Exception as exc:
+        payload["memory_write"] = {"written": 0, "error": str(exc)[:120]}
+    try:
+        bus.publish("brief.generated", {
+            "run_id": payload["run_id"],
+            "confidence": (payload.get("confidence") or {}).get("score"),
+            "topics": len(payload.get("clusters") or []),
+            "sample_mode": sample_mode,
+        }, trace_id=trace_id)
+        payload["bus"] = {"trace_id": trace_id, "event": "brief.generated"}
+    except Exception:
+        payload["bus"] = {"trace_id": trace_id, "event": "unavailable"}
+    memory.clear_working(trace_id)
+
     emit("done", "完成", run_id=payload["run_id"],
          latency_ms=payload["stats"]["latency_ms"])
     return payload
@@ -763,3 +890,110 @@ def _diff_sentence(added, dropped, flipped, delta) -> str:
     if abs(delta) >= 0.03:
         parts.append("置信度 %s %.2f" % ("上升" if delta > 0 else "下降", abs(delta)))
     return "；".join(parts) if parts else "與上一份相同：沒有新主題、沒有方向翻轉，今天不需要改倉位。"
+
+
+# ---------------------------------------------------------------- 五問自檢
+
+def infra() -> dict:
+    """把隊友問的五件事，逐條對到實作位置與當前的真實數字。
+
+    這一頁刻意不寫形容詞：只給端點、計數、代碼檔案。隊友可以當場打這些端點驗證，
+    而不是聽我們說「有做」。
+    """
+    from app import tools
+
+    out: list[dict] = []
+
+    try:
+        bs = bus.stats()
+        out.append({
+            "id": "comms", "q": "遠端 agent 是怎麼通信的？",
+            "short": "HTTP 交換 JSON 信封，trace_id 貫穿，訊息落庫可回放。",
+            "where": "app/bus.py",
+            "endpoints": ["GET /.well-known/agent-card.json",
+                          "POST /api/v1/a2a/inbox",
+                          "GET /api/v1/bus/messages",
+                          "GET /api/v1/bus/trace/{trace_id}"],
+            "metrics": {"訊息": bs["messages"], "決策鏈": bs["traces"],
+                        "失敗": bs["failed"], "平均延遲 ms": bs["avg_latency_ms"],
+                        "可回應方法": len(bs["methods"])},
+            "note": "A1/A2 用 pull（拉 /events），也可以用 POST inbox 主動推。"
+                    "只有冪等方法會自動重試。",
+        })
+    except Exception as exc:
+        out.append({"id": "comms", "q": "遠端 agent 是怎麼通信的？",
+                    "short": "總線不可用：%s" % str(exc)[:80], "where": "app/bus.py",
+                    "endpoints": [], "metrics": {}, "note": ""})
+
+    try:
+        ms = memory.stats()
+        out.append({
+            "id": "memory", "q": "記憶怎麼管理？",
+            "short": "三層：工作／情景／語義；同 key 合併、顯著性半衰、可刪除。",
+            "where": "app/memory.py",
+            "endpoints": ["GET /api/v1/memory", "GET /api/v1/memory/search?q=",
+                          "POST /api/v1/memory", "DELETE /api/v1/memory/{id}"],
+            "metrics": {k: v["count"] for k, v in ms["by_layer"].items()},
+            "note": "半衰期 %.0f 天；檢索打分 = 詞面 0.45 + 顯著性 0.25 + 重要性 0.20 + 新鮮度 0.10"
+                    % ms["half_life_days"],
+        })
+    except Exception as exc:
+        out.append({"id": "memory", "q": "記憶怎麼管理？",
+                    "short": "記憶層不可用：%s" % str(exc)[:80], "where": "app/memory.py",
+                    "endpoints": [], "metrics": {}, "note": ""})
+
+    try:
+        cat = tools.catalog()
+        aus = tools.audit_stats()
+        out.append({
+            "id": "tools", "q": "工具用到了什麼？",
+            "short": "%d 個已註冊工具，帶 JSON Schema、權限級別與調用審計；不存在下單工具。"
+                     % cat["count"],
+            "where": "app/tools.py",
+            "endpoints": ["GET /api/v1/tools", "POST /api/v1/tools/call",
+                          "GET /api/v1/tools/audit"],
+            "metrics": {"工具": cat["count"], "調用": aus["calls"],
+                        "失敗": aus["failed"], "平均 ms": aus["avg_ms"]},
+            "note": cat["policy"],
+        })
+    except Exception as exc:
+        out.append({"id": "tools", "q": "工具用到了什麼？",
+                    "short": "工具層不可用：%s" % str(exc)[:80], "where": "app/tools.py",
+                    "endpoints": [], "metrics": {}, "note": ""})
+
+    try:
+        pm = promptkit.manifest()
+        out.append({
+            "id": "prompts", "q": "提示詞這些又是什麼？",
+            "short": "分六層（system/role/task/context/contract/guard），版本化、可清點、防注入。",
+            "where": "app/prompts/v1 · v2 · app/promptkit.py",
+            "endpoints": ["GET /api/v1/prompts", "GET /api/v1/prompts/{name}"],
+            "metrics": {"提示詞檔": pm["count"], "當前版本": pm["variant"],
+                        "層": len(pm["layers"])},
+            "note": "改之前後都跑 python -m app.evaluate，看 41 項硬條件有沒有退化",
+        })
+    except Exception as exc:
+        out.append({"id": "prompts", "q": "提示詞這些又是什麼？",
+                    "short": "提示詞層不可用：%s" % str(exc)[:80],
+                    "where": "app/promptkit.py", "endpoints": [], "metrics": {}, "note": ""})
+
+    try:
+        rs = rag.stats()
+        out.append({
+            "id": "rag", "q": "有沒有 RAG 向量知識庫？",
+            "short": "有：%d 份文件 / %d 塊，餘弦 + MMR 檢索，每條結論可標 [K1]。" % (
+                rs["docs"], rs["chunks"]),
+            "where": "app/rag.py · app/seeds/",
+            "endpoints": ["GET /api/v1/rag/search?q=", "GET /api/v1/rag/stats",
+                          "POST /api/v1/rag/ingest"],
+            "metrics": {"文件": rs["docs"], "塊": rs["chunks"],
+                        "詞項": rs["terms"], "後端": rs["embed_backend"]},
+            "note": rs["note"],
+        })
+    except Exception as exc:
+        out.append({"id": "rag", "q": "有沒有 RAG 向量知識庫？",
+                    "short": "知識庫不可用：%s" % str(exc)[:80], "where": "app/rag.py",
+                    "endpoints": [], "metrics": {}, "note": ""})
+
+    return {"count": len(out), "items": out,
+            "principle": "每一項都能當場打端點驗證，不接受「有做」這種回答。"}
