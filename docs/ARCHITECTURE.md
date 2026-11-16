@@ -209,7 +209,7 @@ data: {"type":"result","payload":{…完整晨報…}}
 
 `payload["usage"]` 帶 `prompt_tokens / completion_tokens / cost_usd`，
 單價由 `PQ_PRICE_IN_PER_M` / `PQ_PRICE_OUT_PER_M` 決定（預設是 deepseek-chat 的量級）。
-實測一份晨報約 3,100 tokens、US$0.0011。200 個訂閱者每日一份約 US$0.22。
+實測（22 條新聞輸入）約 4,700 tokens、約 US$0.0016。200 個訂閱者每日一份約 US$0.33。
 這個數字寫進報告比「我們會控制成本」有用。
 
 ---
