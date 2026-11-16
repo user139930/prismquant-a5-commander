@@ -155,6 +155,7 @@ function renderRail(health) {
   const rows = [
     ['A1 新聞', health.a1],
     ['A2 政要', health.a2],
+    ['A3 執行', health.a3],
     ['A4 風控', health.a4],
   ];
   const okCount = rows.filter(([, st]) => st && st.ok).length;
@@ -163,10 +164,10 @@ function renderRail(health) {
     const label = ok ? (st.latency_ms != null ? st.latency_ms + 'ms' : '已連線') : '未接入';
     return `<div class="up-row ${ok ? 'ok' : 'off'}"><span class="dot"></span><span>${esc(name)}</span><span class="ms">${esc(label)}</span></div>`;
   }).join('');
-  // 先講清楚「幾個真的接上了」：沒有 A1/A2 時，這裡必須一眼看出是 0/3，不是假裝在線
+  // 先講清楚「幾個真的接上了」：沒有 A1/A2/A3/A4 時，這裡必須一眼看出是 0/4，不是假裝在線
   const sum = okCount === 0
-    ? '<div class="up-sum warn"><b>0/3 已接入</b> · 只有 A5 在跑，用內建示例資料</div>'
-    : `<div class="up-sum"><b>${okCount}/3 已接入</b></div>`;
+    ? `<div class="up-sum warn"><b>0/${rows.length} 已接入</b> · 只有 A5 在跑，用內建示例資料</div>`
+    : `<div class="up-sum"><b>${okCount}/${rows.length} 已接入</b></div>`;
   $('#railUpstream').innerHTML = sum + items;
 }
 
@@ -186,9 +187,11 @@ function renderStatus(payload) {
   const [s1, c1] = stat(a1);
   const [s2, c2] = stat(a2);
 
+  const a3ok = !!(payload && payload.intents && payload.intents.connected);
   $('#statusGrid').innerHTML =
     tile('A1 新聞', s1, c1) +
     tile('A2 政要', s2, c2) +
+    tile('A3 執行', a3ok ? '已連線' : '未接入', a3ok ? 'ok' : 'warn') +
     tile('A4 風控', '未接入', 'warn') +
     tile('大腦', brain ? (brain.mode === 'llm' ? 'LLM · ' + String(brain.topology || '').toUpperCase() : '規則引擎') : '待命', brain && brain.degraded ? 'warn' : 'ok');
 
@@ -343,6 +346,28 @@ function renderBrief(p) {
         這些是上次留下的結論與你的關注詞；只有與本期不同時，正文才會寫「與上次相比」
       </div>`) : '';
 
+  // ---- A3 執行意圖：有就渲染，沒有就留白並寫明等哪個端點 ----
+  const intentInfo = p.intents || {};
+  const intentItems = intentInfo.items || [];
+  const intentCard = intentItems.length
+    ? `<div class="scn pos">
+        <div class="scn-top"><span class="scn-name">執行意圖</span>
+          <span class="scn-prob">${intentItems.length} 條 · A3</span></div>
+        ${intentItems.slice(0, 3).map(it => `<div class="intent-row">
+            <span class="intent-sym">${esc(it.instrument || '—')}</span>
+            <span>${dirTag(it.direction)}</span>
+            <span class="intent-size">${esc(it.size_range || '—')}</span>
+          </div>
+          <div class="kb-text" style="margin:-2px 0 8px">${esc((it.logic || '').slice(0, 90))}</div>`).join('')}
+        <div class="trig">A3 已接入 · 意圖仍需 A4 風控裁決才能執行</div>
+      </div>`
+    : `<div class="scn pos empty" id="gateCard">
+        <div class="scn-top"><span class="scn-name">執行意圖</span><span class="scn-prob">—</span></div>
+        <p>留空：A3 未接入。A5 不自己選標的、不給倉位，只做研究輸出。</p>
+        <div class="trig">等 A3 提供 ${esc(intentInfo.contract || 'GET /api/v1/intents')}</div>
+        <button class="btn btn-ghost btn-sm" data-gate="${esc(p.run_id || '')}" style="align-self:flex-start;margin-top:10px">模擬 A4 審核</button>
+      </div>`;
+
   const cov = p.coverage || {};
   const covChips = (cov.agents || []).map(a => {
     const cls = a.present ? 'ok' : (a.status === 'empty' ? 'warn' : 'missing');
@@ -414,12 +439,7 @@ function renderBrief(p) {
                 <p>留空：需要 A4 回報 gate 狀態，A5 才能講倉位。A4 未接入，這段不生成。</p>
                 <div class="trig">等 A4 提供 /api/v1/risk/check</div>
               </div>
-              <div class="scn pos empty" id="gateCard">
-                <div class="scn-top"><span class="scn-name">執行意圖</span><span class="scn-prob">—</span></div>
-                <p>留空：A3 未實作。本頁不產生任何標的建議或下單意圖，只做研究輸出。</p>
-                <div class="trig">等 A3 提供 /api/v1/intents</div>
-                <button class="btn btn-ghost btn-sm" data-gate="${esc(p.run_id || '')}" style="align-self:flex-start;margin-top:10px">模擬 A4 審核</button>
-              </div>
+              ${intentCard}
             </div>
           <div class="hint" style="margin-top:12px">情境權重由情緒分佈與交叉驗證強度加權得出，是可解釋的相對權重，不是價格預測。</div>`)}
       </div>

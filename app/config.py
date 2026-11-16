@@ -30,9 +30,10 @@ class Settings(BaseSettings):
     port: int = 8130
     cors_origins: list[str] = Field(default_factory=list)
 
-    # ---------- 上游智能體（A1 / A2 已存在，A4 未有） ----------
+    # ---------- 上游智能體（A1 / A2 已存在，A3 / A4 未有） ----------
     a1_api_url: str = "http://127.0.0.1:8010"
     a2_api_url: str = "http://127.0.0.1:8120"
+    a3_api_url: str = ""          # A3 執行代理：留空即為「不產生任何標的建議」
     a4_api_url: str = ""          # A4 風控未接入，留空即為「只有建議權」
     upstream_timeout: float = 6.0
     upstream_limit_a1: int = 40

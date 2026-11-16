@@ -379,9 +379,19 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
         source_note = ("上游 %s 未連線，資料改用內建示例（分析流程是真實執行的，只有輸入是示例）。"
                        % "、".join(failed))
 
+    # A3 執行意圖：沒有它，晨報就只是研究輸出，不會有任何標的建議
+    emit("upstream", "向 A3 要執行意圖" if settings.a3_api_url
+         else "A3 未接入，本頁不產生標的建議")
+    intents, a3_meta = connectors.a3_intents()
+    _note(trace_id, "intents.query", status="ok" if a3_meta.get("ok") else "failed",
+          recipient="A3", payload={"count": len(intents), "transport": "http-pull",
+                                   "endpoint": settings.a3_api_url or "(未設定)"},
+          latency_ms=a3_meta.get("latency_ms") or 0)
+
     upstream_meta = {
         "a1": {**a1_meta, "name": "A1 新聞情報"},
         "a2": {**a2_meta, "name": "A2 政要監控"},
+        "a3": {**a3_meta, "name": "A3 執行代理"},
         "sample_mode": sample_mode,
         "note": source_note,
     }
@@ -390,6 +400,15 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
                                   upstream_meta, focus=focus)
     payload["focus"] = focus
     payload["trace_id"] = trace_id
+    payload["intents"] = {
+        "items": intents,
+        "connected": bool(a3_meta.get("ok")),
+        "note": a3_meta.get("note") or (
+            "A3 已接入：%d 條意圖" % len(intents) if a3_meta.get("ok")
+            else "A3 未接入：本頁不產生任何標的建議或下單意圖"),
+        "contract": "GET /api/v1/intents → {intents:[{instrument,direction,size_range,"
+                    "logic,evidence_ids}]}",
+    }
     emit("analyze",
          "L0 正規化 → L1 交叉驗證（%d 個主題 / %d 組分歧）→ L2 情境推演" % (
              len(payload.get("clusters", [])), len(payload.get("conflicts", []))),
@@ -788,8 +807,15 @@ def coverage(upstream_meta: dict, sample_mode: bool) -> dict:
         out.append({"id": aid, **AGENT_META[aid], "status": status,
                     "present": present, "note": note})
 
-    out.append({"id": "A3", **AGENT_META["A3"], "status": "missing", "present": False,
-                "note": "未實作：本頁不產生任何標的建議或下單意圖，相關區塊留空"})
+    m3 = upstream_meta.get("a3") or {}
+    if m3.get("ok"):
+        n3 = m3.get("count") or 0
+        out.append({"id": "A3", **AGENT_META["A3"], "status": "ok", "present": True,
+                    "note": ("已接入：%d 條執行意圖" % n3) if n3
+                            else "已連線但沒有意圖（策略未執行？）"})
+    else:
+        out.append({"id": "A3", **AGENT_META["A3"], "status": "missing", "present": False,
+                    "note": "未接入：本頁不產生任何標的建議或下單意圖，相關區塊留空"})
     out.append({"id": "A4", **AGENT_META["A4"], "status": "missing", "present": False,
                 "note": "未接入：A5 只有建議權（advisory_only），沒有風控裁決"})
     out.append({"id": "A5", **AGENT_META["A5"], "status": "ok", "present": True,

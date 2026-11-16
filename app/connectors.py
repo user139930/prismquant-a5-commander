@@ -113,6 +113,43 @@ def a2_events(limit: int | None = None) -> tuple[list[dict], dict]:
     return [], meta
 
 
+def a3_intents(limit: int = 6) -> tuple[list[dict], dict]:
+    """A3 執行代理的結構化意圖。
+
+    為什麼 A5 不自己算：選哪隻標的、多少倉位、持多久，是策略與執行層的判斷（proposal
+    Table 3 把 A3 定義為「讀因子庫評分、預選四隻、產出結構化意圖」）。A5 只負責匯總與
+    解釋。沒有 A3 就回空陣列，畫面上留白並寫明等哪個端點——不用假數據填。
+    """
+    if not settings.a3_api_url:
+        return [], {"ok": False, "status": "not_configured", "latency_ms": 0,
+                    "empty": True, "note": "A3 未接入（PQ_A3_API_URL 未設定）"}
+
+    data, meta = _get(settings.a3_api_url, "/api/v1/intents", {"limit": limit})
+    if meta["ok"] and isinstance(data, dict):
+        items = data.get("intents") or []
+        norm = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            norm.append({
+                "instrument": it.get("instrument") or it.get("symbol") or "",
+                "direction": it.get("direction") or "中性",
+                "size_range": it.get("size_range") or it.get("size") or "",
+                "horizon": it.get("horizon") or it.get("holding") or "",
+                "logic": it.get("logic") or it.get("reason") or "",
+                "evidence_ids": it.get("evidence_ids") or it.get("evidence") or [],
+                "confidence": it.get("confidence"),
+            })
+        meta.update({"count": len(norm), "empty": len(norm) == 0,
+                     "agent": data.get("agent", "A3 執行代理")})
+        return norm, meta
+    if meta.get("status") == "offline":
+        return [], meta
+    meta.update({"count": 0, "empty": True,
+                 "note": "A3 端點有回應但沒有 /api/v1/intents（或格式不符）"})
+    return [], meta
+
+
 def health() -> dict:
     out = {}
     with ThreadPoolExecutor(max_workers=3) as pool:
@@ -121,6 +158,12 @@ def health() -> dict:
         (a1_data, a1_meta), (a2_data, a2_meta) = f_a1.result(), f_a2.result()
     out["a1"] = {**a1_meta, "service": (a1_data or {}).get("service", "A1 新聞情報")}
     out["a2"] = {**a2_meta, "service": (a2_data or {}).get("service", "A2 政要監控")}
+    if settings.a3_api_url:
+        _, a3_meta = _get(settings.a3_api_url, "/health", {})
+        out["a3"] = {**a3_meta, "note": "A3 執行代理：提供結構化意圖"}
+    else:
+        out["a3"] = {"ok": False, "status": "not_connected", "latency_ms": 0,
+                     "note": "A3 執行代理未接入，A5 不產生任何標的建議"}
     out["a4"] = {"ok": bool(settings.a4_api_url), "status": "not_connected",
                  "note": "A4 風控未接入，A5 只有建議權"}
     out["a5"] = {"ok": True, "status": "connected", "service": settings.service_name}

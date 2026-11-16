@@ -295,13 +295,36 @@ copy .env.example .env                             # 可選，不設也能跑
 
 ---
 
-## 8. 與 A1 / A2 的契約
+## 8. 與 A1 / A2 / A3 / A4 的契約
+
+四個鄰居，**三種關係**——這一點很容易被誤讀成「只要接 A1/A2」：
+
+| 誰 | 關係 | 沒有它會怎樣 |
+|---|---|---|
+| A1 新聞、A2 政要 | A5 **去拉資料**（pull） | 整份改用內建示例，頁面標紅 |
+| A3 執行 | A5 **去要意圖**（pull） | 不產生任何標的建議、不給倉位，執行意圖卡留白 |
+| A4 風控 | A5 **把意圖交給它審**（submit） | 只有建議權（`advisory_only`），A4 的否決權不存在 |
+
+A5 不自己扮演 A3：選哪隻標的、多少倉位、持多久，是策略與執行層的判斷（proposal Table 3）。
+A5 越過這條線，整份晨報就從「可審計的研究輸出」變成「沒有風控的薦股」。
 
 **A1**：`GET /api/v1/news/events?limit=N` → `{events:[{title, summary, sentiment, topics[], instruments[], confidence, source, url, published}]}`
 
 **A2**（優先）：`GET /api/v1/analyses?limit=N` → `{events:[{title, summary, direction, entities[], markets[], confidence}]}`
 
 **A2**（退化）：`GET /api/v1/public-records?order=published_desc` → 原始記錄，A5 會標記 `degraded` 並以「中性」處理。
+
+**A3**：`GET /api/v1/intents?limit=N` → `{intents:[{instrument, direction, size_range, horizon, logic, evidence_ids[]}]}`
+A5 會把它渲染進晨報的「執行意圖」卡，但**不執行**——要等 A4 放行。
+
+**A4**：`POST /api/v1/risk/check` → `{verdict: pass|degrade|reject, limits, reasons[]}`
+目前 A5 用的是本地**模擬閘門**（五條規則，標記 simulated）；A4 真接入時替換
+`commander.simulate_gate()`。之所以還沒抽成適配器：A4 有否決權，接的時候要處理
+「非同步裁決 / 超時怎麼辦 / 誰替使用者按下確認」，不是改一個 URL 的事。
+
+**接入成本**：
+- A1 / A2 / A3 → 改 `PQ_A1_API_URL` / `PQ_A2_API_URL` / `PQ_A3_API_URL`，**不用改程式**
+- A4 → 需要替換 `simulate_gate()`（約 100 行，主要是把「本地規則」換成「遠端裁決 + 超時降級」）
 
 兩邊都失敗才用示例資料。任何一邊成功、另一邊失敗，仍然整份用示例（見 §5 說明）。
 

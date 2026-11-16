@@ -223,7 +223,7 @@ a:hover{text-decoration:underline}
 .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
 
 /* ============ 狀態磚 ============ */
-.status-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.status-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
 .status-tile{
   background:var(--sunken);border:1px solid var(--line);border-radius:10px;padding:10px 13px;
   display:flex;align-items:center;justify-content:space-between;gap:8px;
@@ -999,3 +999,10 @@ html[data-theme="light"] .rec-why li::before{color:var(--accent)}
 .up-sum.warn b{color:var(--warn-ink)}
 .up-row.off{color:var(--tx-4)}
 .up-row.off .ms{color:var(--tx-4)}
+
+/* A3 執行意圖（接上 A3 之後才會出現） */
+.intent-row{display:flex;align-items:baseline;gap:8px;padding:7px 0 3px;
+  border-top:1px solid var(--hairline);font-size:11.5px}
+.intent-row:first-of-type{border-top:none}
+.intent-sym{font-family:var(--mono);font-size:11px;color:var(--tx);min-width:62px}
+.intent-size{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--tx-3)}

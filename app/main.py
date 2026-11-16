@@ -354,6 +354,15 @@ def integration(probe: bool = False):
             status = "ok" if x.get("ok") else "offline"
             note = ("已連線 · %d ms" % (x.get("latency_ms") or 0)) if x.get("ok") \
                 else "未連線：%s" % (x.get("error") or "沒有回應")
+        elif aid == "A3":
+            x = h.get("a3") or {}
+            if x.get("ok"):
+                intents, m3 = connectors.a3_intents(5)
+                status = "ok"
+                note = "已連線 · %d 條執行意圖" % len(intents)
+            else:
+                status = "missing"
+                note = "未接入：等 GET /api/v1/intents（A5 的執行意圖卡留空）"
         else:
             status, note = "missing", "未實作，A5 相關區塊留空"
         agents.append({"id": aid, **meta, "status": status, "note": note})
