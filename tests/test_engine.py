@@ -68,7 +68,9 @@ class TestBrief(unittest.TestCase):
         score = self.payload["confidence"]["score"]
         self.assertGreaterEqual(score, 0.15)
         self.assertLessEqual(score, 0.85)
-        self.assertLessEqual(score, 0.55, "示例資料必須被壓在 0.55 以下")
+        # 上限由 0.55 提到 0.62：示例庫擴到 22 條新聞 / 9 個媒體之後，一刀切 0.55
+        # 會讓「資料變豐富」在畫面上完全看不出來。仍然低於真實資料的典型值。
+        self.assertLessEqual(score, 0.62, "示例資料必須被壓在 0.62 以下")
         self.assertTrue(self.payload["confidence"]["reasons"])
 
     def test_conflict_detected(self):
@@ -121,7 +123,8 @@ class TestProbe(unittest.TestCase):
     def test_probe_detects_duplicate(self):
         existing = analyze.normalize_a1(connectors.sample_bundle()["a1"]["events"])
         analyze.assign_ids(existing)
-        r = probe.analyze("", "美國擬擴大先進芯片設備出口限制，涉及 12 家供應商", "Bloomberg", "", existing)
+        r = probe.analyze("", "USTR 對 120 億美元進口工業品啟動關稅複審，重點覆蓋機械與電子零部件",
+                          "Reuters", "", existing)
         self.assertTrue(r["corroboration"]["matched"])
         self.assertEqual(r["topic"], "關稅與貿易")
 

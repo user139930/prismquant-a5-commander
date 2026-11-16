@@ -476,6 +476,8 @@ function renderBrief(p) {
     </section>`;
 
   renderStatus(p);
+  pqReveal(out);
+  pqNumbers(out);
   $('#footRun').textContent = `run ${p.run_id || '—'} · ${p.stats ? p.stats.latency_ms + 'ms' : ''}`;
 
   $('#btnCopy').onclick = () => copyText(p.brief_text || '');
@@ -939,10 +941,10 @@ async function doProbe(text, title, source, url) {
 }
 
 const PROBE_SAMPLE = {
-  title: '美國擬對進口半導體設備加徵 25% 關稅，要求 90 天內申報供應鏈',
-  source: 'SCMP',
-  url: 'https://www.scmp.com/business/example-chip-tariff',
-  text: '美國商務部宣布，將對進口半導體製造設備加徵 25% 關稅，並要求相關廠商在 90 天內申報供應鏈來源與最終用途。業界人士表示，此舉將直接推高先進封裝與量測設備的採購成本，部分訂單可能轉向本土供應商，但短期內產能難以替代。市場關注此舉是否會延伸至零部件與售後服務。',
+  title: '美國商務部擬將 6 家中國芯片設備商列入實體清單，涵蓋刻蝕與薄膜沉積環節',
+  source: 'Reuters',
+  url: 'https://www.reuters.com/technology/example-entity-list',
+  text: '知情人士稱，美國商務部工業與安全局（BIS）正準備將 6 家中國半導體設備企業列入實體清單，涉及刻蝕、薄膜沉積與量測環節。被列入企業將無法採購美國技術佔比超過 25% 的零部件，現有訂單可申請 90 天緩衝期。業界人士表示，此舉將加速中國設備廠商的國產替代，但短期內先進製程設備交付會延遲 3–6 個月；同時應用材料、科林研發與 KLA 在中國區的收入佔比約 28%–35%，可能面臨下修。市場關注管制是否會延伸至零部件與售後服務，以及是否波及在華合資廠的既有產線。',
 };
 
 /* ---------------------------------------------------------------- 大腦 */
@@ -1456,6 +1458,7 @@ function tickClock() {
 }
 
 async function init() {
+  initMotion();
   tickClock();
   setInterval(tickClock, 1000);
   paintThemeBtn();
@@ -1772,6 +1775,7 @@ function renderInfra(arch, busData, mem, tl, pr, rs) {
   ].join('');
 
   bindInfra();
+  pqReveal(document.getElementById('infraCards'));
 }
 
 function bindInfra() {
@@ -1874,4 +1878,82 @@ async function loadInfra() {
     safe(api('/api/v1/rag/stats')),
   ]);
   renderInfra(arch, busData, mem, tl, pr, rs);
+}
+
+/* ---------------------------------------------------------------- 視覺層 v2
+   入場動畫、滾動進度、數字滾動。全部可降級：沒有 IntersectionObserver 就直接顯示。 */
+
+let __pqIO = null;
+
+function pqReveal(root) {
+  if (!('IntersectionObserver' in window)) return;
+  if (!__pqIO) {
+    __pqIO = new IntersectionObserver((entries) => {
+      let i = 0;
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        const el = e.target;
+        setTimeout(() => el.classList.add('is-in'), Math.min(60 * i++, 300));
+        __pqIO.unobserve(el);
+      });
+    }, { threshold: 0.05, rootMargin: '0px 0px -30px 0px' });
+  }
+  const sel = '.card, .hero, .sec, .stat-tile, .side-card, .infra-card, .agent-card, .watch-card, .conflict, .kb-row';
+  (root || document).querySelectorAll(sel).forEach((el) => {
+    if (el.dataset.pqSeen) return;
+    el.dataset.pqSeen = '1';
+    el.classList.add('reveal');
+    __pqIO.observe(el);
+  });
+}
+
+function pqCountUp(el, to, dec) {
+  // 系統要求減少動態、或截圖／無頭瀏覽器：直接給終值，避免截到中間值
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) { el.textContent = to.toFixed(dec); return; }
+  const dur = 720;
+  const t0 = performance.now();
+  const tick = (t) => {
+    const k = Math.min(1, (t - t0) / dur);
+    const e = 1 - Math.pow(1 - k, 3);
+    el.textContent = (to * e).toFixed(dec);
+    if (k < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function pqNumbers(root) {
+  (root || document).querySelectorAll('.gauge-num').forEach((el) => {
+    if (el.dataset.pqRolled) return;
+    const v = parseFloat(el.textContent);
+    if (isNaN(v)) return;
+    el.dataset.pqRolled = '1';
+    pqCountUp(el, v, 2);
+  });
+}
+
+function initMotion() {
+  // 頂部滾動進度條
+  const bar = document.getElementById('pq-progress');
+  const main = document.querySelector('.main');
+  if (bar && main) {
+    const onScroll = () => {
+      const h = main.scrollHeight - main.clientHeight;
+      bar.style.width = ((h > 0 ? main.scrollTop / h : 0) * 100).toFixed(2) + '%';
+      bar.classList.toggle('on', main.scrollTop > 10);
+    };
+    main.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+  // hero 光暈跟隨游標（很輕，只是讓大面積深色有點呼吸）
+  const hero = document.querySelector('.hero');
+  if (hero) {
+    document.querySelector('.main').addEventListener('mousemove', (e) => {
+      const r = hero.getBoundingClientRect();
+      if (e.clientY < r.top - 160 || e.clientY > r.bottom + 160) return;
+      hero.style.setProperty('--mx', (((e.clientX - r.left) / r.width) * 100).toFixed(1) + '%');
+      hero.style.setProperty('--my', (((e.clientY - r.top) / r.height) * 100).toFixed(1) + '%');
+    }, { passive: true });
+  }
+  pqReveal();
 }

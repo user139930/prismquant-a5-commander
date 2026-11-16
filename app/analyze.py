@@ -510,7 +510,13 @@ def confidence_score(quality: dict, conflicts: list[dict], clusters: list[dict],
     reasons: list[str] = ["基礎分 0.45（中等偏低：只覆蓋新聞與政策兩條線，沒有行情與倉位數據）"]
 
     pub = quality["distinct_publishers"]
-    if pub >= 3:
+    if pub >= 8:
+        score += 0.20
+        reasons.append("+0.20 新聞面有 %d 個獨立媒體，交叉驗證充分" % pub)
+    elif pub >= 5:
+        score += 0.16
+        reasons.append("+0.16 新聞面有 %d 個獨立媒體，交叉驗證成立" % pub)
+    elif pub >= 3:
         score += 0.12
         reasons.append("+0.12 新聞面有 %d 個獨立媒體，交叉驗證成立" % pub)
     elif pub == 2:
@@ -533,8 +539,11 @@ def confidence_score(quality: dict, conflicts: list[dict], clusters: list[dict],
         reasons.append("-%.2f %d 組 A1／A2 方向衝突，結論需要保留兩面" % (penalty, len(conflicts)))
 
     if quality["single_source_topics"]:
-        score -= 0.06
-        reasons.append("-0.06 存在單一來源主題：%s" % "、".join(quality["single_source_topics"]))
+        n_single = len(quality["single_source_topics"])
+        penalty_single = min(0.10, 0.03 * n_single)
+        score -= penalty_single
+        reasons.append("-%.2f 存在單一來源主題：%s" % (
+            penalty_single, "、".join(quality["single_source_topics"])))
 
     newest = quality["newest_age_hours"]
     if newest is not None and newest > 24:
@@ -544,8 +553,8 @@ def confidence_score(quality: dict, conflicts: list[dict], clusters: list[dict],
         reasons.append("+0.00 最新消息 %.1f 小時內，時效正常" % newest)
 
     if sample_mode:
-        score = min(score, 0.55)
-        reasons.append("上限 0.55：示例資料，不能當真實結論")
+        score = min(score, 0.62)
+        reasons.append("上限 0.62：示例資料，不能當真實結論")
 
     score = round(max(0.15, min(0.85, score)), 2)
     level = "高" if score >= 0.7 else ("中" if score >= 0.5 else "低")
