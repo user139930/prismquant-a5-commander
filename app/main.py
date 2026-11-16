@@ -380,7 +380,7 @@ def integration(probe: bool = False):
         "health": h,
         "sample": sample,
         "ledger": ledger.stats(),
-        "sample_data_policy": "A1/A2 離線時整份改用內建示例；分析流程、大模型、合規檢查都是真實執行。",
+        "sample_data_policy": "A1/A2 離線時整份改用內建樣本；分析、大模型、合規檢查照常執行，樣本條目標記 sampled。",
     }
 
 
@@ -759,7 +759,7 @@ def compliance():
             "A4 風控未接入：本服務不產生任何下單指令。",
             "大模型沒有價格特權資訊，輸出可能幻覺，因此每條結論必須帶證據 ID。",
         ],
-        "sample_mode_policy": "任何上游失敗時整份改用示例資料，並在頁面標示，不真假混用。",
+        "sample_mode_policy": "任何上游失敗時整份改用內建樣本並在頁面標示，不真假混用。",
     }
 
 

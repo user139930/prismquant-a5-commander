@@ -179,7 +179,7 @@ def fetch_all(a1_limit: int | None = None, a2_limit: int | None = None):
 
 
 def sample_bundle() -> dict:
-    """載入內建示例資料，並把 ago_hours 換算成真實時間戳（示範畫面才不會出現陳年舊聞）。"""
+    """載入內建樣本，並把 ago_hours 換算成真實時間戳（否則示範畫面會出現陳年舊聞）。"""
     try:
         bundle = json.loads(FIXTURE.read_text(encoding="utf-8"))
     except Exception:

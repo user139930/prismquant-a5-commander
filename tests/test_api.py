@@ -163,7 +163,7 @@ class TestApi(unittest.TestCase):
             p = cm.run("離線測試", "rule")
         self.assertTrue(p["data_quality"]["sample_mode"])
         self.assertGreater(len(p["evidence"]), 0)
-        self.assertIn("示例", p["source_note"])
+        self.assertIn("樣本", p["source_note"])
 
     def test_coverage_contract(self):
         run = self.client.post("/api/v1/commander/run", json={"question": "coverage"}).json()

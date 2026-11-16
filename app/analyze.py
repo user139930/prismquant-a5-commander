@@ -349,7 +349,7 @@ def data_quality(atoms: list[dict], sample_mode: bool) -> dict:
     if newest is not None and newest > 6:
         notes.append("最新一條消息已是 %.1f 小時前，盤前資訊可能不完整。" % newest)
     if sample_mode:
-        notes.append("A1 / A2 未連線，本頁使用內建示例資料（已標示），不可用作真實決策。")
+        notes.append("A1 / A2 未連線，本頁輸入為內建樣本（已標示）；分析流程照常執行，但不可用作真實決策。")
 
     return {
         "publishers": publishers,
@@ -554,7 +554,7 @@ def confidence_score(quality: dict, conflicts: list[dict], clusters: list[dict],
 
     if sample_mode:
         score = min(score, 0.62)
-        reasons.append("上限 0.62：示例資料，不能當真實結論")
+        reasons.append("上限 0.62：輸入為樣本，不能當真實結論")
 
     score = round(max(0.15, min(0.85, score)), 2)
     level = "高" if score >= 0.7 else ("中" if score >= 0.5 else "低")

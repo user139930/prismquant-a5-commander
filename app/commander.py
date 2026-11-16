@@ -3,7 +3,7 @@
 
 一次 run 的順序（也是報告裡可以畫的那張流程圖）：
 
-    1. 取上游      A1 新聞 + A2 政要監控；任何一邊失敗 → 整份改用示例資料（不真假混用）
+    1. 取上游      A1 新聞 + A2 政要監控；任何一邊失敗 → 整份改用內建樣本（不真假混用）
     2. 規則層      analyze.build_brief()：L0 正規化、L1 交叉驗證、L2 情境推演
     3. 大腦層      按 PQ_BRAIN_TOPOLOGY 決定要不要叫大模型；只讓它寫「表達」，不准改事實
     4. 護欄        禁語掃描、證據可追溯、A4 未接入 → advisory_only
@@ -376,7 +376,7 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
         a2 = bundle["a2"]["events"]
         sample_mode = True
         failed = [name for name, meta in (("A1 新聞", a1_meta), ("A2 政要", a2_meta)) if not meta.get("ok")]
-        source_note = ("上游 %s 未連線，資料改用內建示例（分析流程是真實執行的，只有輸入是示例）。"
+        source_note = ("上游 %s 未連線，本頁輸入改用內建樣本；分析、護欄與留檔照常執行。"
                        % "、".join(failed))
 
     # A3 執行意圖：沒有它，晨報就只是研究輸出，不會有任何標的建議
@@ -799,7 +799,7 @@ def coverage(upstream_meta: dict, sample_mode: bool) -> dict:
     for aid in ("A1", "A2"):
         m = upstream_meta.get(aid.lower()) or {}
         if not m.get("ok"):
-            status, present, note = "offline", False, "未連線，本頁改用示例資料"
+            status, present, note = "offline", False, "未連線，本頁輸入改用內建樣本"
         elif m.get("empty"):
             status, present, note = "empty", False, "已連線但沒有資料（未執行 /collect？）"
         else:

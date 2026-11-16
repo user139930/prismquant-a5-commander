@@ -309,7 +309,7 @@ def _memory_write(text: str, layer: str = "episodic", kind: str = "note",
     return memory.remember(text, layer=layer, kind=kind, key=key, importance=importance)
 
 
-@tool("confidence.compute", "算置信度", "用加減分規則算置信度：媒體數、單源、衝突、時效、示例資料。",
+@tool("confidence.compute", "算置信度", "用加減分規則算置信度：媒體數、單源、衝突、時效、樣本數據。",
       {"type": "object", "properties": {
           "sources": {"type": "integer", "description": "獨立來源數"},
           "conflicts": {"type": "integer", "description": "分歧組數"},
@@ -331,7 +331,7 @@ def _confidence_compute(sources: int = 1, conflicts: int = 0,
     score = max(0.05, min(0.95, score))
     return {"score": round(score, 2),
             "level": "高" if score >= 0.7 else ("中" if score >= 0.5 else "低"),
-            "note": "規則加減分，非模型自評；示例資料上限 0.55"}
+            "note": "規則加減分，非模型自評；輸入為樣本時上限 0.62"}
 
 
 @tool("risk.gate", "風控閘門（模擬）", "對一份晨報的傳導鏈跑五條規則，回通過／降級／否決。",

@@ -166,7 +166,7 @@ function renderRail(health) {
   }).join('');
   // 先講清楚「幾個真的接上了」：沒有 A1/A2/A3/A4 時，這裡必須一眼看出是 0/4，不是假裝在線
   const sum = okCount === 0
-    ? `<div class="up-sum warn"><b>0/${rows.length} 已接入</b> · 只有 A5 在跑，用內建示例資料</div>`
+    ? `<div class="up-sum warn"><b>0/${rows.length} 已接入</b> · 只有 A5 在跑，輸入為內建樣本</div>`
     : `<div class="up-sum"><b>${okCount}/${rows.length} 已接入</b></div>`;
   $('#railUpstream').innerHTML = sum + items;
 }
@@ -229,7 +229,7 @@ function renderBrief(p) {
     const hintText = (brain.degrade_reason || '已降級');
     notes.push(`<div class="note-line">↯ ${esc(hintText)}　<a href="#brain" style="white-space:nowrap">到大腦拓撲貼上自己的 key →</a></div>`);
   }
-  if (q.sample_mode && !p.source_note) notes.push(`<div class="note-line">ℹ 上游標記為示例資料，本頁不可用作真實決策。</div>`);
+  if (q.sample_mode && !p.source_note) notes.push(`<div class="note-line">ℹ 本頁輸入為內建樣本（上游未連線），不可用作真實決策。</div>`);
 
   const hero = `<div class="hero">
     <div class="hero-eyebrow">
@@ -1427,7 +1427,7 @@ async function loadCompliance() {
         <section class="sec">
           <div class="sec-head"><span class="sec-num">D</span><h3>免責聲明</h3><span class="sec-sub">DISCLAIMER</span></div>
           <p style="font-size:12.5px;color:var(--tx-2);line-height:1.8">${esc(d.disclaimer)}</p>
-          <div class="note-line info" style="margin-top:10px">示例資料策略：${esc(d.sample_mode_policy)}</div>
+          <div class="note-line info" style="margin-top:10px">樣本策略：${esc(d.sample_mode_policy)}</div>
         </section>
       </div>
 
