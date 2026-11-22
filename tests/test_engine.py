@@ -94,7 +94,9 @@ class TestGuardrails(unittest.TestCase):
         # 對外文字（headline / 章節）必須乾淨；guard 報告本身會記錄原詞，這是審計需要
         self.assertNotIn("必漲", clean["headline"])
         self.assertNotIn("穩賺", clean["headline"])
-        self.assertIn(guardrails.PLACEHOLDER, clean["headline"])
+        # v1.1 起改寫而非刪句：資訊保留、承諾去掉（見 app/compliance.py）
+        self.assertIn("偏多", clean["headline"])
+        self.assertIn("多數收漲", clean["headline"])
         self.assertEqual(clean["sections"]["what_happened"], ["正常內容"])
         self.assertFalse(clean["guard"]["passed"])
         self.assertEqual(clean["guard"]["a4_gate"], "advisory_only")
@@ -110,7 +112,9 @@ class TestGuardrails(unittest.TestCase):
     def test_clean_payload_passes(self):
         clean = guardrails.apply({"headline": "中性偏空", "evidence": [], "transmission": [], "conflicts": []})
         self.assertTrue(clean["guard"]["passed"])
-        self.assertIn("不構成投資建議", clean["disclaimer"])
+        self.assertIn("不構成任何", clean["disclaimer"])
+        self.assertIn("投資建議", clean["disclaimer"])
+        self.assertIn("advisory_only", clean["disclaimer"])
 
 
 class TestProbe(unittest.TestCase):

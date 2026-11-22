@@ -451,7 +451,7 @@ function renderBrief(p) {
   const guard = p.guard || {};
   const guardInner = `<div class="note-line ${guard.passed ? '' : 'bad'}" style="margin-top:0">
       ${guard.passed ? '⛨' : '⛔'} ${esc(guard.note || '')}
-      ${guard.blocked && guard.blocked.length ? `<br>已攔截：${guard.blocked.map(b => esc(b.phrase)).join('、')}` : ''}
+      ${guard.blocked && guard.blocked.length ? `<br>已改寫：${guard.blocked.map(b => `${esc(b.phrase)} → ${esc(b.replacement || '中性表述')}`).join('　·　')}` : ''}
       ${guard.broken_evidence && guard.broken_evidence.length ? `<br>無法追溯的證據：${guard.broken_evidence.map(esc).join('、')}` : ''}
     </div>
     <div class="hint" style="margin-top:8px">${esc(p.disclaimer || '')}</div>`;
