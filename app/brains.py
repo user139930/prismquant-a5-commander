@@ -139,6 +139,53 @@ def _endpoint() -> str:
     return settings.llm_base_url.rstrip("/") + "/chat/completions"
 
 
+_HTTP_HINT = {
+    400: "請求被拒（模型名稱或參數不對）",
+    401: "key 無效或已過期",
+    402: "額度不足（去服務商後台充值）",
+    403: "這個 key 沒有調用該模型的權限",
+    404: "找不到端點或模型",
+    429: "請求太頻繁或超出配額",
+    500: "服務商內部錯誤，稍後再試",
+    502: "上游不可用（OpenRouter 常見，換個模型或稍後再試）",
+    503: "服務商暫時不可用，稍後再試",
+}
+
+
+def _error_text(node: Any) -> str:
+    """把各家不同的錯誤格式壓成一句話：OpenAI/OpenRouter/DeepSeek 都是 {"error":{"message":...}}。"""
+    if not isinstance(node, dict):
+        return ""
+    err = node.get("error")
+    if isinstance(err, dict):
+        return str(err.get("message") or err.get("code") or "")[:200]
+    if isinstance(err, str):
+        return err[:200]
+    return str(node.get("message") or "")[:200]
+
+
+def _http_hint(resp) -> str:
+    code = resp.status_code
+    detail = _error_text_local(resp) or (resp.text or "")[:160]
+    base = _HTTP_HINT.get(code, "請求失敗（HTTP %d）" % code)
+    tip = ""
+    if code in (401, 403):
+        tip = "　·　檢查 key 有沒有貼完整、前後有沒有空格；key 與 base_url 要屬於同一家"
+    elif code == 404:
+        tip = ("　·　OpenRouter 用 https://openrouter.ai/api/v1，"
+               "OpenAI 用 https://api.openai.com/v1，DeepSeek 用 https://api.deepseek.com/v1")
+    elif code == 400:
+        tip = "　·　確認模型名稱存在（例如 deepseek/deepseek-chat 是 OpenRouter 的寫法）"
+    return "%s：%s%s" % (base, detail or "（服務端沒有給原因）", tip)
+
+
+def _error_text_local(resp) -> str:
+    try:
+        return _error_text(resp.json())
+    except Exception:
+        return ""
+
+
 def chat_json(system: str, user: str, role: Role, max_tokens: int = 1600) -> tuple[Any, dict]:
     """回傳 (json, meta)。任何失敗都拋 LLMError，由呼叫方降級到規則層。"""
     if not settings.llm_api_key:
@@ -152,18 +199,33 @@ def chat_json(system: str, user: str, role: Role, max_tokens: int = 1600) -> tup
         "response_format": {"type": "json_object"},
     }
     started = time.time()
+    url = _endpoint()
     try:
         with httpx.Client(timeout=settings.llm_timeout) as client:
             resp = client.post(
-                _endpoint(), json=body,
+                url, json=body,
                 headers={"Authorization": "Bearer %s" % settings.llm_api_key,
                          "HTTP-Referer": "https://github.com/user139930/prismquant-a5-commander",
                          "X-Title": "PrismQuant A5 Commander"},
             )
-        resp.raise_for_status()
-        data = resp.json()
+    except httpx.TimeoutException:
+        raise LLMError(
+            "連線逾時（%d 秒）：%s 沒有回應。先確認網絡，或把 PQ_LLM_TIMEOUT 調大。"
+            % (settings.llm_timeout, url))
     except Exception as exc:
-        raise LLMError("%s: %s" % (type(exc).__name__, str(exc)[:200]))
+        raise LLMError("連不上 %s：%s" % (url, str(exc)[:140]))
+
+    # HTTP 4xx/5xx 一定要解釋成人話——只拋 '401 Unauthorized' 沒人看得懂該改什麼
+    if resp.status_code >= 400:
+        raise LLMError(_http_hint(resp))
+
+    try:
+        data = resp.json()
+    except Exception:
+        raise LLMError("回應不是 JSON（HTTP %d）：%s" % (resp.status_code, resp.text[:160]))
+
+    if isinstance(data, dict) and data.get("error"):
+        raise LLMError("服務端回報錯誤：%s" % (_error_text(data) or "未提供原因"))
 
     text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "") or ""
     usage = data.get("usage") or {}

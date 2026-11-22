@@ -1575,6 +1575,28 @@ async function init() {
     renderHistory();
     renderCompareBox();
   };
+  // 貼上 key 就先判斷是哪一家：省得貼了 OpenAI 的 key 卻用 OpenRouter 的位址
+  const keyInput = $('#llmKey');
+  if (keyInput) keyInput.addEventListener('input', (e) => {
+    const k = (e.target.value || '').trim();
+    const hint = $('#llmKeyHint');
+    if (!hint) return;
+    if (!k) { hint.textContent = ''; hint.className = 'hint'; return; }
+    if (k.startsWith('sk-or-')) {
+      hint.textContent = '偵測到 OpenRouter key · Base URL 用 https://openrouter.ai/api/v1，模型寫成 vendor/model（例如 deepseek/deepseek-chat）';
+      hint.className = 'hint';
+    } else if (k.startsWith('sk-proj-') || (k.startsWith('sk-') && !k.startsWith('sk-or-'))) {
+      hint.textContent = '偵測到 OpenAI 風格的 key · 若確實是 OpenAI，Base URL 要改成 https://api.openai.com/v1，模型用 gpt-4o-mini；若其實是 DeepSeek 官方 key，Base URL 用 https://api.deepseek.com/v1';
+      hint.className = 'hint';
+    } else if (k.startsWith('sk-ant-')) {
+      hint.textContent = '這是 Anthropic 的 key，本專案走 OpenAI 兼容介面，暫不支援';
+      hint.className = 'hint bad';
+    } else {
+      hint.textContent = '無法從前綴判斷服務商：請確認 Base URL 與模型名稱屬於同一家';
+      hint.className = 'hint';
+    }
+  });
+
   const bk = $('#btnSaveKey');
   if (bk) bk.onclick = () => saveLlm(false);
   const btk = $('#btnTestKey');
