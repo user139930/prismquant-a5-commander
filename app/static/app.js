@@ -14,6 +14,8 @@ const VIEW_META = {
   compliance: ['合規', 'GUARDRAILS', '對外說話前的最後一道閘'],
 };
 
+const SIDE_LABEL = { a1: 'A1 新聞面', a2: 'A2 政策面', neutral: '兩邊都不站' };
+
 const S = {
   view: 'brief', topology: null, meta: null, health: null,
   brief: null, probe: null, brain: null, runs: [], selectedRun: null, busy: false,
@@ -217,21 +219,35 @@ function bullets(list) {
 async function recordStance(btn) {
   const topic = btn.dataset.topic;
   const side = btn.dataset.side;
-  const box = btn.closest('.stance');
-  const btns = box ? box.querySelectorAll('.stance-btn') : [];
+  const card = btn.closest('.duel-card');
+  const btns = card ? card.querySelectorAll('.stance-btn') : [];
   btns.forEach(b => b.disabled = true);
   try {
     const r = await api('/api/v1/stance', {
       method: 'POST',
       body: JSON.stringify({ topic, side, run_id: (S.brief || {}).run_id || '' }),
     });
-    btns.forEach(b => b.classList.toggle('is-on', b === btn));
-    const state = box && box.querySelector('.stance-state');
-    if (state) {
-      state.classList.add('is-set');
-      state.innerHTML = `已記錄：<b>${esc(r.label)}</b>${(r.times || 1) > 1 ? ' · ' + r.times + ' 次' : ''}`;
+    S.picks = S.picks || {};
+    S.picks[topic] = side;
+
+    // 局部重繪這張卡：對峙高亮 + 狀態文字
+    if (card) {
+      card.querySelectorAll('.duel-side').forEach(el => {
+        el.classList.toggle('pick', el.dataset.side === side);
+        el.classList.toggle('dim', side !== 'neutral' && el.dataset.side !== side);
+      });
+      btns.forEach(b => {
+        b.classList.toggle('is-on', b === btn);
+        b.classList.remove('on-a1', 'on-a2');
+      });
+      const state = card.querySelector('.pick-state');
+      if (state) {
+        state.textContent = '已表態：' + (r.label || side);
+        state.classList.add('on');
+      }
     }
     toast('已記住你的傾向，下次同主題會先看它');
+    renderAdjudication();
   } catch (e) {
     toast(e.message, true);
   } finally {
@@ -239,8 +255,65 @@ async function recordStance(btn) {
   }
 }
 
+// 全部表態後，在分歧區底部長出一張裁決書
+function renderAdjudication() {
+  const box = document.getElementById('adjudication');
+  const p = S.brief;
+  if (!box || !p) return;
+  const cs = p.conflicts || [];
+  const picks = S.picks || {};
+  const answered = cs.filter(c => picks[c.topic]);
+  if (!cs.length || answered.length < cs.length) {
+    box.innerHTML = '';
+    return;
+  }
+
+  const rows = cs.map(c => {
+    const mine = picks[c.topic];
+    const sys = (c.resolution || '').includes('政策面') ? 'a2'
+              : (c.resolution || '').includes('新聞面') ? 'a1' : '';
+    const same = sys && mine === sys;
+    return `<div class="adj-row">
+      <span class="adj-k">${esc(c.topic)}</span>
+      <span class="adj-v">
+        <span class="adj-pill">你選</span><b>${esc(SIDE_LABEL[mine] || mine)}</b>
+        ${sys ? `　·　<span class="adj-pill">系統</span>${sys === 'a2' ? '政策面' : '新聞面'}
+        <br><span class="${same ? 'adj-same' : 'adj-diff'}">${same ? '✓ 與系統判斷一致' : '≠ 與系統判斷不同'}</span>` : ''}
+      </span>
+    </div>`;
+  }).join('');
+
+  const agree = cs.filter(c => {
+    const mine = picks[c.topic];
+    const sys = (c.resolution || '').includes('政策面') ? 'a2'
+              : (c.resolution || '').includes('新聞面') ? 'a1' : '';
+    return sys && mine === sys;
+  }).length;
+
+  const tone = agree === cs.length
+    ? '你與系統全部一致。這說明你更看重「接下來怎麼做」而不是「過去發生了什麼」。'
+    : agree === 0
+      ? '你與系統全部不同。這不代表你錯——規則是固定的，人能看到規則沒覆蓋的東西。'
+      : '你部分同意系統。一致性不是目標，看對才是。';
+
+  box.innerHTML = `<div class="adj-card">
+    <div class="adj-head">
+      <span class="adj-seal">⚖</span>
+      <div><h4>你的裁決書</h4>
+        <span class="adj-stamp">${esc((p.run_id || '').slice(0, 18))} · 已寫入語義記憶</span></div>
+    </div>
+    <div class="adj-body">${rows}
+      <div class="adj-row"><span class="adj-k">整體讀法</span><span class="adj-v">${tone}</span></div>
+    </div>
+    <div class="adj-foot">下次遇到同主題的分歧，系統會先說「你上次站 ${esc(SIDE_LABEL[picks[cs[0].topic]] || '')}」。
+      立場影響敘述角度，不影響事實判斷。</div>
+  </div>`;
+  box.querySelector('.adj-card').classList.add('in');
+}
+
 function renderBrief(p) {
   S.brief = p;
+  S.picks = {};
   const out = $('#briefOut');
   out.classList.remove('is-chat');
   const conf = p.confidence || {};
@@ -300,28 +373,53 @@ function renderBrief(p) {
 
   // 分歧裁決：系統給建議，但最終立場由使用者按。按過的寫進語義記憶，下次先講。
   const stances = p.stances || {};
-  const SIDE = { a1: '新聞面', a2: '政策面', neutral: '兩邊都不站' };
-  const conflictBlocks = (p.conflicts || []).map(c => {
+  // ── 分歧：兩邊對峙，使用者拍板 ──────────────────────────────
+  const dirOf = (t) => /偏多|利多/.test(t || '') ? 'up' : (/偏空|利空/.test(t || '') ? 'down' : '');
+  S.picks = S.picks || {};
+  (p.conflicts || []).forEach(c => {
+    const hist = (stances[c.topic] || {}).side;
+    if (hist && !S.picks[c.topic]) S.picks[c.topic] = hist;
+  });
+
+  const duelCard = (c) => {
+    const pick = S.picks[c.topic] || '';
     const st = stances[c.topic] || {};
-    const state = st.side
-      ? `<span class="stance-state is-set">上次站了 <b>${esc(SIDE[st.side] || st.side)}</b>${(st.times || 1) > 1 ? ' · ' + st.times + ' 次' : ''}</span>`
-      : '<span class="stance-state">未表態</span>';
-    const btns = ['a1', 'a2', 'neutral'].map(side =>
-      `<button class="stance-btn${st.side === side ? ' is-on' : ''}" data-topic="${esc(c.topic)}" data-side="${side}">${SIDE[side]}</button>`
+    const state = pick
+      ? `<span class="pick-state on">已表態：${esc(SIDE_LABEL[pick] || pick)}</span>`
+      : '<span class="pick-state">未表態</span>';
+    const side = (key, who, text) => {
+      const cls = pick === key ? ' pick' : (pick ? ' dim' : '');
+      return `<div class="duel-side ${key}${cls}" data-side="${key}">
+        <div class="ds-top">
+          <span class="who"><i></i>${who}</span>
+          <span class="dir ${dirOf(text)}">${/偏多|利多/.test(text) ? '偏多' : (/偏空|利空/.test(text) ? '偏空' : '中性')}</span>
+        </div>
+        <p class="ds-txt">${esc(text)}</p>
+      </div>`;
+    };
+    const btns = ['a1', 'a2', 'neutral'].map(k =>
+      `<button class="stance-btn${pick === k ? ' is-on' : ''}" data-topic="${esc(c.topic)}" data-side="${k}">${SIDE_LABEL[k]}</button>`
     ).join('');
-    return `<div class="conflict">
-      <div class="conflict-top"><span class="ct-topic">${esc(c.topic)}</span><span class="tag tag-flat">方向相反</span></div>
-      <div class="conflict-cols">
-        <div class="conflict-col"><div class="cc-who">A1 新聞面</div><div class="cc-txt">${esc(c.a1)}</div></div>
-        <div class="conflict-col"><div class="cc-who">A2 政策面</div><div class="cc-txt">${esc(c.a2)}</div></div>
+    return `<div class="conflict duel-card" data-topic="${esc(c.topic)}">
+      <div class="duel-head">
+        <span class="ct-topic">${esc(c.topic)}</span>
+        <span class="tag tag-flat">方向相反</span>
+        ${state}
       </div>
-      <div class="conflict-res"><em>裁決</em>　${esc(c.resolution)}<br><em>作廢條件</em>　${esc(c.breaks_if)}</div>
+      <div class="duel-grid">
+        ${side('a1', 'A1 新聞面', c.a1)}
+        <div class="duel-vs"><span>VS</span></div>
+        ${side('a2', 'A2 政策面', c.a2)}
+      </div>
+      <div class="duel-res"><em>系統裁決</em>　${esc(c.resolution)}<br><em>作廢條件</em>　${esc(c.breaks_if)}</div>
       <div class="stance">
-        <div class="stance-head"><span class="stance-q">系統給了建議，但這條線你怎麼看？</span>${state}</div>
+        <div class="stance-head"><span class="stance-q">系統給了建議，但這條線你怎麼看？</span>
+          ${st.times > 1 ? `<span class="stance-state is-set">歷史上站過 ${st.times} 次</span>` : ''}</div>
         <div class="stance-opts">${btns}</div>
       </div>
     </div>`;
-  }).join('');
+  };
+  const conflictBlocks = (p.conflicts || []).map(duelCard).join('');
 
   const scnCls = { '基準情境': 'base', '偏多情境': 'bull', '偏空情境': 'bear', '倉位含義': 'pos' };
   const scnCards = (p.scenarios || []).map(s2 => `<div class="scn ${scnCls[s2.name] || ''}">
@@ -473,7 +571,8 @@ function renderBrief(p) {
         ${secBlock('04', '傳導矩陣', 'TRANSMISSION', `<div class="table-wrap"><table>
           <thead><tr><th>起點</th><th>通道</th><th>標的</th><th>方向</th><th>強度</th><th>時間尺度</th><th>證據</th></tr></thead>
           <tbody>${transRows || '<tr><td colspan="7" class="hint">（無）</td></tr>'}</tbody></table></div>`)}
-        ${conflictBlocks ? secBlock('05', '分歧裁決', 'CONFLICT', conflictBlocks) : ''}
+        ${conflictBlocks ? secBlock('05', '分歧裁決', 'CONFLICT',
+          `${conflictBlocks}<div id="adjudication" class="adjudication"></div>`) : ''}
         ${secBlock(conflictBlocks ? '06' : '05', '情境推演', 'SCENARIOS', `${scnBar}<div class="scn-grid three">${scnCards}</div>
             <div class="scn-grid two" style="margin-top:12px">
               <div class="scn pos empty">
@@ -531,6 +630,7 @@ function renderBrief(p) {
   $('#btnReplaySelf').onclick = () => replayRun(p.run_id);
   $$('#briefOut .chip[data-follow]').forEach(b => b.onclick = () => followUp(b.dataset.follow));
   $$('#briefOut .stance-btn').forEach(b => b.onclick = () => recordStance(b));
+  renderAdjudication();
   const fi = $('#followInput');
   if (fi) fi.addEventListener('keydown', e => { if (e.key === 'Enter') followUp(fi.value); });
   const bf = $('#btnFollow');
