@@ -214,6 +214,31 @@ function bullets(list) {
   return `<ul class="bullets">${list.map(x => `<li>${evTags(x)}</li>`).join('')}</ul>`;
 }
 
+async function recordStance(btn) {
+  const topic = btn.dataset.topic;
+  const side = btn.dataset.side;
+  const box = btn.closest('.stance');
+  const btns = box ? box.querySelectorAll('.stance-btn') : [];
+  btns.forEach(b => b.disabled = true);
+  try {
+    const r = await api('/api/v1/stance', {
+      method: 'POST',
+      body: JSON.stringify({ topic, side, run_id: (S.brief || {}).run_id || '' }),
+    });
+    btns.forEach(b => b.classList.toggle('is-on', b === btn));
+    const state = box && box.querySelector('.stance-state');
+    if (state) {
+      state.classList.add('is-set');
+      state.innerHTML = `已記錄：<b>${esc(r.label)}</b>${(r.times || 1) > 1 ? ' · ' + r.times + ' 次' : ''}`;
+    }
+    toast('已記住你的傾向，下次同主題會先看它');
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
 function renderBrief(p) {
   S.brief = p;
   const out = $('#briefOut');
@@ -273,14 +298,30 @@ function renderBrief(p) {
       <td>${(t.evidence || []).map(x => `<span class="ev-chip">${esc(x)}</span>`).join('')}</td>
     </tr>`).join('');
 
-  const conflictBlocks = (p.conflicts || []).map(c => `<div class="conflict">
+  // 分歧裁決：系統給建議，但最終立場由使用者按。按過的寫進語義記憶，下次先講。
+  const stances = p.stances || {};
+  const SIDE = { a1: '新聞面', a2: '政策面', neutral: '兩邊都不站' };
+  const conflictBlocks = (p.conflicts || []).map(c => {
+    const st = stances[c.topic] || {};
+    const state = st.side
+      ? `<span class="stance-state is-set">上次站了 <b>${esc(SIDE[st.side] || st.side)}</b>${(st.times || 1) > 1 ? ' · ' + st.times + ' 次' : ''}</span>`
+      : '<span class="stance-state">未表態</span>';
+    const btns = ['a1', 'a2', 'neutral'].map(side =>
+      `<button class="stance-btn${st.side === side ? ' is-on' : ''}" data-topic="${esc(c.topic)}" data-side="${side}">${SIDE[side]}</button>`
+    ).join('');
+    return `<div class="conflict">
       <div class="conflict-top"><span class="ct-topic">${esc(c.topic)}</span><span class="tag tag-flat">方向相反</span></div>
       <div class="conflict-cols">
         <div class="conflict-col"><div class="cc-who">A1 新聞面</div><div class="cc-txt">${esc(c.a1)}</div></div>
         <div class="conflict-col"><div class="cc-who">A2 政策面</div><div class="cc-txt">${esc(c.a2)}</div></div>
       </div>
       <div class="conflict-res"><em>裁決</em>　${esc(c.resolution)}<br><em>作廢條件</em>　${esc(c.breaks_if)}</div>
-    </div>`).join('');
+      <div class="stance">
+        <div class="stance-head"><span class="stance-q">系統給了建議，但這條線你怎麼看？</span>${state}</div>
+        <div class="stance-opts">${btns}</div>
+      </div>
+    </div>`;
+  }).join('');
 
   const scnCls = { '基準情境': 'base', '偏多情境': 'bull', '偏空情境': 'bear', '倉位含義': 'pos' };
   const scnCards = (p.scenarios || []).map(s2 => `<div class="scn ${scnCls[s2.name] || ''}">
@@ -489,6 +530,7 @@ function renderBrief(p) {
   $('#btnTg').onclick = () => openTelegram(p);
   $('#btnReplaySelf').onclick = () => replayRun(p.run_id);
   $$('#briefOut .chip[data-follow]').forEach(b => b.onclick = () => followUp(b.dataset.follow));
+  $$('#briefOut .stance-btn').forEach(b => b.onclick = () => recordStance(b));
   const fi = $('#followInput');
   if (fi) fi.addEventListener('keydown', e => { if (e.key === 'Enter') followUp(fi.value); });
   const bf = $('#btnFollow');

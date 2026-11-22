@@ -134,6 +134,14 @@ class ProbeRequest(BaseModel):
     url: str = ""
 
 
+class StanceRequest(BaseModel):
+    """使用者對某組分歧的裁決。存進語義記憶，下次同主題會先看它。"""
+    topic: str
+    side: str = "a1"          # a1 / a2 / neutral
+    note: str = ""
+    run_id: str = ""
+
+
 class CompareRequest(BaseModel):
     question: str = "生成今天的晨報"
     topologies: list[str] = Field(default_factory=lambda: ["lens", "split"])
@@ -599,6 +607,28 @@ def bus_send(req: BusSendRequest):
 
 
 # ---------------------------------------------------------------- 記憶
+
+@app.post("/api/v1/stance")
+def set_stance(req: StanceRequest):
+    """記錄使用者在某組分歧上的立場。
+
+    為什麼不放進 brief payload 而是寫記憶：立場要跨晨報存活，
+    而且它會影響下一次的裁決敘述（「你上次站政策面」）。
+    """
+    label = {"a1": "新聞面", "a2": "政策面", "neutral": "兩邊都不站"}.get(req.side, req.side)
+    topic = (req.topic or "").strip()
+    if not topic:
+        raise HTTPException(422, detail={"code": "bad_topic", "message": "缺少 topic"})
+    text = "%s：使用者傾向 %s" % (topic, label)
+    if req.note:
+        text += "（%s）" % req.note.strip()[:60]
+    r = memory.remember(text=text, layer="semantic", kind="stance",
+                        key="stance:" + topic, importance=0.75,
+                        source_run=req.run_id,
+                        meta={"topic": topic, "side": req.side, "label": label})
+    return {"ok": bool(r.get("ok")), "label": label, "id": r.get("id"),
+            "times": r.get("hits", 1), "note": "已記錄，下次同主題會先看你的傾向"}
+
 
 @app.get("/api/v1/memory")
 def memory_list(layer: str | None = None, limit: int = 40):

@@ -580,3 +580,25 @@ html[data-theme="dark"] .cmp-hl{color:var(--tx)}
 #briefOut.is-chat .cc-body{font-size:14px;line-height:1.95}
 #briefOut.is-chat .cc-sug{margin-top:auto;padding-top:18px}
 #briefOut.is-chat .chat-card{display:flex;flex-direction:column}
+
+/* ---------------------------------------------------------------- 分歧裁決：把決定權交回去 */
+.stance{margin-top:14px;padding-top:13px;border-top:1px dashed var(--hairline)}
+.stance-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}
+.stance-q{font-size:11.5px;color:var(--tx-3);line-height:1.5}
+.stance-state{flex:none;font-size:10.5px;color:var(--tx-4);font-family:var(--mono);white-space:nowrap}
+.stance-state.is-set{color:var(--accent)}
+.stance-state b{font-weight:600}
+.stance-opts{display:flex;gap:7px;flex-wrap:wrap}
+.stance-btn{
+  padding:5px 13px;border-radius:9px;border:1px solid var(--line-2);
+  background:var(--pill-bg);color:var(--tx-2);font-size:11.5px;cursor:pointer;
+  transition:transform .16s cubic-bezier(.16,1,.3,1), background .2s, border-color .2s, color .2s;
+}
+.stance-btn:hover{border-color:var(--line-3);color:var(--tx);transform:translateY(-1px)}
+.stance-btn:active{transform:translateY(0) scale(.98)}
+.stance-btn.is-on{
+  background:var(--accent-weak);
+  border-color:color-mix(in srgb,var(--accent) 45%, transparent);
+  color:var(--accent);font-weight:600;
+}
+.stance-btn:disabled{opacity:.55;cursor:wait;transform:none}

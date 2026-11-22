@@ -133,6 +133,24 @@ class TestApi(unittest.TestCase):
         if body["has_previous"]:
             self.assertIn("confidence", body)
 
+    def test_stance_roundtrip(self):
+        """使用者裁決要能寫進記憶，並在下一份晨報裡被讀回來。"""
+        r = self.client.post("/api/v1/stance",
+                             json={"topic": "利率與貨幣政策", "side": "a2", "run_id": "t"})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["label"], "政策面")
+
+        p = self.client.post("/api/v1/commander/run", json={"topology": "rule"}).json()
+        stances = p.get("stances") or {}
+        self.assertIn("利率與貨幣政策", stances)
+        self.assertEqual(stances["利率與貨幣政策"]["side"], "a2")
+
+    def test_stance_rejects_empty_topic(self):
+        r = self.client.post("/api/v1/stance", json={"topic": "  ", "side": "a1"})
+        self.assertEqual(r.status_code, 422)
+
     def test_watchlist_roundtrip(self):
         r = self.client.get("/api/v1/watchlist")
         self.assertEqual(r.status_code, 200)

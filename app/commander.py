@@ -70,6 +70,13 @@ def _facts(payload: dict) -> str:
     conflicts = "\n".join(
         "- %s｜A1 %s｜A2 %s" % (c["topic"], c["a1"], c["a2"]) for c in payload.get("conflicts", [])
     ) or "（無）"
+    stances = payload.get("stances") or {}
+    stance_text = "\n".join(
+        "- %s：使用者上次站 %s（累計 %d 次）" % (
+            topic, {"a1": "新聞面", "a2": "政策面", "neutral": "兩邊都不站"}.get(v.get("side"), v.get("side")),
+            v.get("times") or 1)
+        for topic, v in stances.items()
+    ) or "（無）"
     transmission = "\n".join(
         "- %s → %s → %s（%s，%s）證據 %s" % (
             t["from"], t["channel"], "／".join(t["to"]), t["direction"], t["strength"],
@@ -84,6 +91,7 @@ def _facts(payload: dict) -> str:
         "clusters": clusters,
         "evidence": evidence,
         "conflicts": conflicts,
+        "stances": stance_text,
         "transmission": transmission,
         "confidence": "%.2f（%s）｜%s" % (conf.get("score", 0), conf.get("level", ""),
                                          "；".join(conf.get("reasons", []))),
@@ -400,6 +408,25 @@ def run(question: str = "", topology: str | None = None, progress=None) -> dict:
                                   upstream_meta, focus=focus)
     payload["focus"] = focus
     payload["trace_id"] = trace_id
+    # 使用者對各組分歧的歷史立場：裁決權在使用者，不在系統
+    stances: dict = {}
+    try:
+        pool = memory.recall("", k=200, kind="stance")["hits"]
+        by_key = {h.get("key"): h for h in pool}
+        for c in payload.get("conflicts") or []:
+            h = by_key.get("stance:" + c["topic"])
+            if not h:
+                continue
+            stances[c["topic"]] = {
+                "side": (h.get("meta") or {}).get("side", ""),
+                "text": h["text"],
+                "at": h.get("last_hit") or h.get("created_at"),
+                "times": h.get("hits", 1),
+            }
+    except Exception:
+        pass
+    payload["stances"] = stances
+
     payload["intents"] = {
         "items": intents,
         "connected": bool(a3_meta.get("ok")),
