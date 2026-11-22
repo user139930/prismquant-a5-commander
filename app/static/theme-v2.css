@@ -697,3 +697,50 @@ html[data-theme="dark"] .cmp-hl{color:var(--tx)}
   .duel-vs{display:none}
   .adj-row{grid-template-columns:1fr;gap:4px}
 }
+
+/* ---------------------------------------------------------------- 分歧：四輪交鋒 */
+.rounds{margin:6px 0 16px}
+.round{display:grid;grid-template-columns:38px 1fr;gap:10px;align-items:start}
+.round + .round{margin-top:11px}
+.round-no{
+  font-family:var(--mono);font-size:9.5px;color:var(--tx-4);letter-spacing:.1em;
+  padding-top:12px;text-align:right;
+}
+.round-body{
+  border-left:2px solid var(--line-2);border-radius:0 10px 10px 0;
+  padding:10px 14px 11px;background:rgba(255,255,255,.015);
+  transition:background .25s,border-color .25s;
+}
+.round.a1 .round-body{
+  border-left-color:color-mix(in srgb,var(--accent) 72%, transparent);
+  background:linear-gradient(90deg,rgba(122,168,255,.075),transparent 72%);
+}
+.round.a2 .round-body{
+  border-left-color:color-mix(in srgb,var(--accent-2) 72%, transparent);
+  background:linear-gradient(90deg,rgba(167,139,250,.075),transparent 72%);
+  margin-left:26px;
+}
+.round:hover .round-body{background:rgba(255,255,255,.035)}
+.round-tag{
+  font-size:9.5px;color:var(--tx-4);letter-spacing:.05em;margin-bottom:5px;
+  font-family:var(--mono);
+}
+.round-tag b{color:var(--tx-3);font-weight:600;letter-spacing:.03em}
+.round p{font-size:12.5px;color:var(--tx-2);line-height:1.78}
+@media (max-width:760px){
+  .round{grid-template-columns:28px 1fr;gap:8px}
+  .round.a2 .round-body{margin-left:0}
+}
+
+/* 裁決書蓋章：一個很小的細節，但演示時會有人「哦」一聲 */
+.adj-card{position:relative;overflow:hidden}
+.adj-card::after{
+  content:"已裁決";position:absolute;right:22px;top:58px;
+  font-size:10.5px;letter-spacing:.24em;color:rgba(224,188,124,.62);
+  border:1px solid rgba(224,188,124,.42);border-radius:6px;padding:4px 9px 4px 12px;
+  transform:rotate(-9deg);opacity:0;
+  transition:opacity .5s ease .35s;
+  pointer-events:none;
+}
+.adj-card.in::after{opacity:1}
+@media (max-width:760px){.adj-card::after{display:none}}

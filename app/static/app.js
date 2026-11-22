@@ -387,16 +387,17 @@ function renderBrief(p) {
     const state = pick
       ? `<span class="pick-state on">已表態：${esc(SIDE_LABEL[pick] || pick)}</span>`
       : '<span class="pick-state">未表態</span>';
-    const side = (key, who, text) => {
-      const cls = pick === key ? ' pick' : (pick ? ' dim' : '');
-      return `<div class="duel-side ${key}${cls}" data-side="${key}">
-        <div class="ds-top">
-          <span class="who"><i></i>${who}</span>
-          <span class="dir ${dirOf(text)}">${/偏多|利多/.test(text) ? '偏多' : (/偏空|利空/.test(text) ? '偏空' : '中性')}</span>
+    const rounds = c.rounds || [
+      { no: '01', who: 'a1', label: '立論', text: c.a1 },
+      { no: '02', who: 'a2', label: '立論', text: c.a2 },
+    ];
+    const roundHtml = rounds.map(r => `<div class="round ${r.who}">
+        <span class="round-no">${esc(r.no)}</span>
+        <div class="round-body">
+          <div class="round-tag"><b>${r.who === 'a1' ? 'A1 新聞面' : 'A2 政策面'}</b>　${esc(r.label)}</div>
+          <p>${esc(r.text)}</p>
         </div>
-        <p class="ds-txt">${esc(text)}</p>
-      </div>`;
-    };
+      </div>`).join('');
     const btns = ['a1', 'a2', 'neutral'].map(k =>
       `<button class="stance-btn${pick === k ? ' is-on' : ''}" data-topic="${esc(c.topic)}" data-side="${k}">${SIDE_LABEL[k]}</button>`
     ).join('');
@@ -406,14 +407,10 @@ function renderBrief(p) {
         <span class="tag tag-flat">方向相反</span>
         ${state}
       </div>
-      <div class="duel-grid">
-        ${side('a1', 'A1 新聞面', c.a1)}
-        <div class="duel-vs"><span>VS</span></div>
-        ${side('a2', 'A2 政策面', c.a2)}
-      </div>
+      <div class="rounds">${roundHtml}</div>
       <div class="duel-res"><em>系統裁決</em>　${esc(c.resolution)}<br><em>作廢條件</em>　${esc(c.breaks_if)}</div>
       <div class="stance">
-        <div class="stance-head"><span class="stance-q">系統給了建議，但這條線你怎麼看？</span>
+        <div class="stance-head"><span class="stance-q">聽完四輪，這條線你怎麼看？</span>
           ${st.times > 1 ? `<span class="stance-state is-set">歷史上站過 ${st.times} 次</span>` : ''}</div>
         <div class="stance-opts">${btns}</div>
       </div>

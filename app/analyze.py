@@ -418,12 +418,35 @@ def detect_conflicts(clusters: list[dict]) -> list[dict]:
             continue
         if a1_score * a2_score >= 0:
             continue
+        # 三輪交鋒：各自立論 → 互相回應 → 系統裁決。
+        # 回應用規則拼裝（不調模型）：一句話點出對方論據的時間屬性差異，讓對立「有來回」。
+        a1_ev = [a["id"] for a in _pick(c["a1"], 2)]
+        a2_ev = [a["id"] for a in _pick(c["a2"], 2)]
+        n_a1, n_a2 = len(c["a1"]), len(c["a2"])
+        a1_rebut = (
+            "你引用的 %s 是已經公布的數字，但價格走的是接下來。表態可以改，數據不會——"
+            "若 %s 在下一次會議轉向，這一組的判斷要整個重寫。"
+            % ("、".join(a1_ev) or "新聞面證據", "、".join(a2_ev) or "政策面表態")
+        )
+        a2_rebut = (
+            "你看到的是過去 %s 天的存量（%d 條），我講的是決定接下來 %s 天的變量（%d 條）。"
+            "事件驅動的定價權在手裡握著工具的那一方，不在統計局。"
+            % ("30", n_a1, "30", n_a2)
+        )
         out.append({
             "topic": c["label"],
             "a1": "新聞面%s（%s）" % (_dir_word(a1_score), _join_titles(c["a1"], 2)),
             "a2": "政策面%s（%s）" % (_dir_word(a2_score), _join_titles(c["a2"], 2)),
-            "a1_evidence": [a["id"] for a in _pick(c["a1"], 2)],
-            "a2_evidence": [a["id"] for a in _pick(c["a2"], 2)],
+            "a1_evidence": a1_ev,
+            "a2_evidence": a2_ev,
+            "a1_rebut": a1_rebut,
+            "a2_rebut": a2_rebut,
+            "rounds": [
+                {"no": "01", "who": "a1", "label": "立論", "text": "新聞面%s（%s）" % (_dir_word(a1_score), _join_titles(c["a1"], 2))},
+                {"no": "02", "who": "a2", "label": "立論", "text": "政策面%s（%s）" % (_dir_word(a2_score), _join_titles(c["a2"], 2))},
+                {"no": "03", "who": "a1", "label": "回應", "text": a1_rebut},
+                {"no": "04", "who": "a2", "label": "回應", "text": a2_rebut},
+            ],
             "resolution": (
                 "按 PrismQuant 衝突規則，事件驅動的政策面（A2）優先於新聞面（A1）："
                 "該組只下調風險預算、不反向開倉，等 A2 的正式文件落地再看。"
