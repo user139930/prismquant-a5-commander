@@ -133,6 +133,30 @@ class TestApi(unittest.TestCase):
         if body["has_previous"]:
             self.assertIn("confidence", body)
 
+    def test_guard_endpoint_rewrites_and_flags(self):
+        """對外合規端點：改寫措辭、標失效引用，並回傳可直接使用的文本。"""
+        r = self.client.post("/api/v1/guard", json={
+            "text": "這隻股票必漲，建議倉位 30%。關稅壓力（N1），需求強勁（N9）。",
+            "evidence_ids": ["N1", "P2"],
+            "a4_connected": False,
+        })
+        self.assertEqual(r.status_code, 200)
+        d = r.json()
+        self.assertNotIn("必漲", d["text"])
+        self.assertIn("偏多", d["text"])
+        self.assertIn("A4 裁決", d["text"])
+        self.assertEqual(d["broken"], ["N9"])
+        self.assertFalse(d["passed"])
+        self.assertTrue(d["advisory_only"])
+        self.assertTrue(d["disclaimer"])
+
+    def test_guard_without_evidence_ids_skips_citation_check(self):
+        """不傳證據清單時只做措辭改寫，不誤報引用失效。"""
+        r = self.client.post("/api/v1/guard", json={"text": "某公司（N99）宣布回購。"})
+        d = r.json()
+        self.assertEqual(d["broken"], [])
+        self.assertIn("N99", d["text"])
+
     def test_stance_roundtrip(self):
         """使用者裁決要能寫進記憶，並在下一份晨報裡被讀回來。"""
         r = self.client.post("/api/v1/stance",

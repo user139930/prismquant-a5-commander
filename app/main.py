@@ -24,6 +24,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -32,6 +33,7 @@ from pydantic import BaseModel, Field
 
 from app import (brains, bus, commander, connectors, guardrails, ledger, memory,
                  promptkit, rag, scheduler, store, telegram, tools)
+from app.compliance import Compliance
 from app.config import settings
 
 STATIC = Path(__file__).parent / "static"
@@ -132,6 +134,13 @@ class ProbeRequest(BaseModel):
     text: str
     source: str = ""
     url: str = ""
+
+
+class GuardRequest(BaseModel):
+    """外部系統（例如 Winter）呼叫合規檢查的入參。"""
+    text: str
+    evidence_ids: list[str] = []      # 呼叫方現有的證據編號；空 = 跳過引用校驗
+    a4_connected: bool = False        # A4 接上後傳 true，才會允許明確倉位
 
 
 class StanceRequest(BaseModel):
@@ -607,6 +616,87 @@ def bus_send(req: BusSendRequest):
 
 
 # ---------------------------------------------------------------- 記憶
+
+@app.get("/api/v1/winter/review")
+def winter_review(limit: int = 6):
+    """旁路審查 Winter 的輸出：拉它的消息，清洗一遍，回傳「原文 vs 審查後」。
+
+    不改對方任何代碼，也不寫它的資料庫——只讀 HTTP，把差異擺出來。
+    對方沒開（8766 連不上）就老實說連不上，不假裝有結果。
+    """
+    base = settings.winter_api_url.rstrip("/")
+    try:
+        with httpx.Client(timeout=4, trust_env=False) as client:
+            convs = client.get(base + "/api/v1/conversations").json()
+            if not isinstance(convs, list):
+                raise ValueError("會話列表格式不符")
+            convs = convs[:3]
+            out = []
+            for c in convs:
+                cid = c.get("id")
+                if not cid:
+                    continue
+                msgs = client.get(base + "/api/v1/conversations/%s/messages" % cid).json()
+                rows = []
+                for m in (msgs if isinstance(msgs, list) else []):
+                    raw = m.get("content") or ""
+                    if not raw.strip():
+                        continue
+                    verdict = Compliance().apply(raw, check_position=True)
+                    rows.append({
+                        "id": m.get("id"),
+                        "agent": m.get("agent") or "",
+                        "created_at": m.get("created_at") or "",
+                        "original": raw,
+                        "reviewed": verdict["text"],
+                        "changed": verdict["flagged"],
+                        "blocked": verdict["blocked"],
+                        "broken": verdict["broken"],
+                    })
+                out.append({"id": cid, "title": c.get("title") or "（無標題）",
+                            "updated_at": c.get("updated_at") or "",
+                            "messages": rows[-limit:]})
+    except Exception as exc:
+        return {"ok": False, "winter": base,
+                "error": "%s: %s" % (type(exc).__name__, str(exc)[:120]),
+                "hint": "先啟動 Winter（winter.cmd，8766），或在 .env 改 PQ_WINTER_API_URL"}
+
+    changed = sum(1 for c in out for m in c["messages"] if m["changed"])
+    total = sum(len(c["messages"]) for c in out)
+    return {
+        "ok": True,
+        "winter": base,
+        "conversations": out,
+        "summary": {
+            "messages": total,
+            "changed": changed,
+            "blocked": sum(len(m["blocked"]) for c in out for m in c["messages"]),
+            "broken": sum(len(m["broken"]) for c in out for m in c["messages"]),
+        },
+    }
+
+
+@app.post("/api/v1/guard")
+def guard_text(req: GuardRequest):
+    """給外部系統用的合規檢查：送一段文字，回傳清洗後的版本。
+
+    為什麼要有這個端點：隊友的 Winter 有自己的 A5（調度器），不該把兩套代碼合併。
+    正確的整合是服務調服務——他在寫入訊息前 POST 一次這裡，拿到乾淨的文本繼續。
+    合約見 docs/GUARD-API.md。
+    """
+    g = Compliance(a4_connected=bool(req.a4_connected))
+    verdict = g.apply(req.text, allowed_ids=req.evidence_ids or None)
+    return {
+        "text": verdict["text"],
+        "passed": verdict["ok"],
+        "flagged": verdict["flagged"],
+        "blocked": verdict["blocked"],
+        "broken": verdict["broken"],
+        "notes": verdict["notes"],
+        "disclaimer": verdict["disclaimer"],
+        "advisory_only": verdict["advisory_only"],
+    }
+
 
 @app.post("/api/v1/stance")
 def set_stance(req: StanceRequest):

@@ -744,3 +744,50 @@ html[data-theme="dark"] .cmp-hl{color:var(--tx)}
 }
 .adj-card.in::after{opacity:1}
 @media (max-width:760px){.adj-card::after{display:none}}
+
+/* ---------------------------------------------------------------- 審查 Winter */
+.winter-head{
+  display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+  padding:16px 20px;margin-bottom:16px;
+  border:1px solid var(--line);border-radius:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.025),transparent);
+}
+.wh-item{display:flex;flex-direction:column;gap:2px}
+.wh-item span{font-size:10px;color:var(--tx-4);letter-spacing:.05em}
+.wh-item b{font-family:var(--mono);font-size:20px;font-weight:500;color:var(--tx);line-height:1.1}
+.wh-item.warn b{color:var(--warn-ink)}
+.wh-item.bad b{color:var(--bad-ink)}
+.wh-src{margin-left:auto;font-size:10px;color:var(--tx-4)}
+
+.wmsg{
+  padding:14px 0;border-top:1px solid var(--hairline);
+}
+.wmsg:first-of-type{border-top:none}
+.wmsg-head{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.wmsg-flag{
+  font-size:9.5px;padding:1px 7px;border-radius:5px;
+  background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
+}
+.wmsg-ok{
+  font-size:9.5px;padding:1px 7px;border-radius:5px;
+  background:var(--ok-bg);color:var(--ok-ink);border:1px solid var(--ok-line);
+}
+.wmsg-cols{display:grid;grid-template-columns:1fr;gap:10px}
+.wmsg.is-changed .wmsg-cols{grid-template-columns:1fr 1fr}
+.wmsg-col{padding:10px 13px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line)}
+.wmsg-col.after{
+  background:linear-gradient(90deg,rgba(122,168,255,.07),transparent 70%);
+  border-color:color-mix(in srgb,var(--accent) 22%, var(--line));
+}
+.wmsg-label{font-size:9.5px;color:var(--tx-4);letter-spacing:.08em;margin-bottom:5px;font-family:var(--mono)}
+.wmsg-col p{font-size:12.5px;line-height:1.78;color:var(--tx-2)}
+.wmsg-col.after p{color:var(--tx)}
+.wmsg-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.wmsg-chip{
+  font-size:10.5px;padding:2px 8px;border-radius:5px;font-family:var(--mono);
+  background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-line);
+}
+.wmsg-chip.bad{background:var(--bad-bg);color:var(--bad-ink);border-color:var(--bad-line)}
+@media (max-width:760px){
+  .wmsg.is-changed .wmsg-cols{grid-template-columns:1fr}
+}

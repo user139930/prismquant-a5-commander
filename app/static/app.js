@@ -12,6 +12,7 @@ const VIEW_META = {
   integration: ['整合狀態', 'WIRING', '五個代理的接線狀態'],
   infra: ['智能體基建', 'AGENT INFRA', '五個問題，五個零件'],
   compliance: ['合規', 'GUARDRAILS', '對外說話前的最後一道閘'],
+  winter: ['審查 Winter', 'CROSS-REVIEW', '不改它的代碼，只讀它的輸出'],
 };
 
 const SIDE_LABEL = { a1: 'A1 新聞面', a2: 'A2 政策面', neutral: '兩邊都不站' };
@@ -149,6 +150,7 @@ function switchView(view, keepHash) {
   if (view === 'compliance') loadCompliance();
   if (view === 'integration') loadIntegration();
   if (view === 'infra') loadInfra();
+  if (view === 'winter') loadWinter();
 }
 
 /* ---------------------------------------------------------------- 狀態 */
@@ -1542,6 +1544,61 @@ async function refreshMeta() {
 }
 
 /* ---------------------------------------------------------------- 合規 */
+
+async function loadWinter() {
+  const out = $('#winterOut');
+  if (!out) return;
+  out.innerHTML = '<div class="hint">正在讀取 Winter（8766）…</div>';
+  try {
+    const d = await api('/api/v1/winter/review');
+    if (!d.ok) {
+      out.innerHTML = `<div class="card"><div class="empty">
+        <div class="empty-mark">◌</div>
+        <strong>連不上 Winter</strong>
+        <p>${esc(d.hint || '')}</p>
+        <p class="mono" style="font-size:10.5px;color:var(--tx-4);margin-top:8px">${esc(d.error || '')}</p>
+      </div></div>`;
+      return;
+    }
+    const s = d.summary || {};
+    const head = `<div class="winter-head">
+      <div class="wh-item"><span>讀到消息</span><b>${s.messages || 0}</b></div>
+      <div class="wh-item ${s.changed ? 'warn' : ''}"><span>被改寫</span><b>${s.changed || 0}</b></div>
+      <div class="wh-item ${s.blocked ? 'warn' : ''}"><span>改動處</span><b>${s.blocked || 0}</b></div>
+      <div class="wh-item ${s.broken ? 'bad' : ''}"><span>引用失效</span><b>${s.broken || 0}</b></div>
+      <div class="wh-src mono">來源 ${esc(d.winter)}</div>
+    </div>`;
+
+    const convs = (d.conversations || []).map(c => `
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-head">
+          <h3>${esc(c.title)}</h3>
+          <p class="mono" style="font-size:10px;color:var(--tx-4)">
+            ${esc((c.updated_at || '').slice(0, 16).replace('T', ' '))}　·　${c.messages.length} 條</p>
+        </div>
+        ${c.messages.map(m => `
+          <div class="wmsg ${m.changed ? 'is-changed' : ''}">
+            <div class="wmsg-head">
+              <span class="tag tag-a1">${esc(m.agent || 'A5')}</span>
+              <span class="mono" style="font-size:10px;color:var(--tx-4)">${esc((m.created_at || '').slice(11, 16))}</span>
+              ${m.changed ? '<span class="wmsg-flag">已改寫</span>' : '<span class="wmsg-ok">原文合規</span>'}
+            </div>
+            <div class="wmsg-cols">
+              <div class="wmsg-col"><div class="wmsg-label">原文</div><p>${esc(m.original)}</p></div>
+              ${m.changed ? `<div class="wmsg-col after"><div class="wmsg-label">審查後</div><p>${esc(m.reviewed)}</p></div>` : ''}
+            </div>
+            ${(m.blocked || []).length ? `<div class="wmsg-chips">${m.blocked.map(b =>
+              `<span class="wmsg-chip">${esc(b.phrase)} → ${esc(b.replacement)}</span>`).join('')}</div>` : ''}
+            ${(m.broken || []).length ? `<div class="wmsg-chips"><span class="wmsg-chip bad">引用失效：${m.broken.map(esc).join('、')}</span></div>` : ''}
+          </div>`).join('')}
+      </div>`).join('');
+
+    out.innerHTML = head + (convs || '<div class="hint">Winter 還沒有任何對話</div>');
+    pqReveal(out);
+  } catch (e) {
+    out.innerHTML = `<div class="card"><div class="empty"><strong>讀取失敗</strong><p>${esc(e.message)}</p></div></div>`;
+  }
+}
 
 async function loadCompliance() {
   try {

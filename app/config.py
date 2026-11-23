@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     a2_api_url: str = "http://127.0.0.1:8120"
     a3_api_url: str = ""          # A3 執行代理：留空即為「不產生任何標的建議」
     a4_api_url: str = ""          # A4 風控未接入，留空即為「只有建議權」
+
+    # ---------- 可選：旁路審查隊友的 Winter 工作台 ----------
+    # 不改對方任何代碼：只讀它的 HTTP 接口，把輸出拉過來清洗一遍給你看。
+    winter_api_url: str = "http://127.0.0.1:8766"
     upstream_timeout: float = 6.0
     upstream_limit_a1: int = 40
     upstream_limit_a2: int = 20

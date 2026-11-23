@@ -64,6 +64,9 @@
       <button class="nav-item" data-view="compliance">
         <span class="nav-ico">⛨</span><span>合規</span><em>GUARD</em>
       </button>
+      <button class="nav-item" data-view="winter">
+        <span class="nav-ico">⇢</span><span>審查 Winter</span><em>REVIEW</em>
+      </button>
     </nav>
 
     <div class="rail-panel">
@@ -317,6 +320,15 @@
     </section>
 
     <!-- ============ 合規 ============ -->
+    <section class="view" id="view-winter">
+      <div class="section-head">
+        <h2>審查 Winter 的輸出</h2>
+        <p>只讀它的接口，不改它的任何代碼：把它最近生成的內容拉過來，過一遍合規層，
+           把「原文」和「審查後」擺在一起。它那邊一個字都不用動。</p>
+      </div>
+      <div id="winterOut"></div>
+    </section>
+
     <section class="view" id="view-compliance">
       <div class="section-head">
         <h2>合規護欄</h2>
