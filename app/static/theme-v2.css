@@ -816,3 +816,10 @@ html[data-theme="dark"] .cmp-hl{color:var(--tx)}
 .hc-txt b{color:var(--tx);font-weight:600}
 .hc-arrow{color:var(--accent);font-size:14px;flex:none;transition:transform .22s}
 .hero-cta:hover .hc-arrow{transform:translateX(3px)}
+
+/* 等待提示：把「16 秒」解釋清楚，不要讓人以為當機 */
+.pg-wait{
+  margin-top:10px;font-size:11px;color:var(--warn-ink);line-height:1.7;
+  min-height:0;transition:opacity .3s;
+}
+.pg-wait:empty{display:none}

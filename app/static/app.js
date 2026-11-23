@@ -764,7 +764,18 @@ function showProgress() {
     <ul class="pg-list" id="pgList">
       ${STAGES.map(([k, label]) => `<li data-stage="${k}"><span class="pg-dot"></span><span class="pg-label">${label}</span><span class="pg-msg"></span></li>`).join('')}
     </ul>
+    <div class="pg-wait" id="pgWait"></div>
   </div>`;
+
+  // 超過 8 秒還沒好就說清楚在等什麼——16 秒的等待如果沒有任何解釋，很像當機
+  let sec = 0;
+  const tick = setInterval(() => {
+    sec += 1;
+    const el = document.getElementById('pgWait');
+    if (!el) { clearInterval(tick); return; }
+    if (sec === 8) el.textContent = '模型響應較慢，仍在等…（最長 45 秒，之後自動降級為規則層）';
+    else if (sec === 25) el.textContent = '已等 25 秒，可能遇到排隊或限流。再等等，或改用規則層生成。';
+  }, 1000);
 }
 
 function pushProgress(ev) {
