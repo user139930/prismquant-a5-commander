@@ -791,3 +791,28 @@ html[data-theme="dark"] .cmp-hl{color:var(--tx)}
 @media (max-width:760px){
   .wmsg.is-changed .wmsg-cols{grid-template-columns:1fr}
 }
+
+/* hero 上的分歧入口：把「皇帝那個功能」放到首屏看得見的位置 */
+.hero-cta{
+  display:flex;align-items:center;gap:10px;width:100%;
+  margin-top:16px;padding:11px 16px;
+  border:1px solid color-mix(in srgb,var(--accent) 26%, var(--line));
+  border-radius:11px;
+  background:linear-gradient(90deg,rgba(122,168,255,.10),rgba(167,139,250,.05) 62%,transparent);
+  color:var(--tx-2);font-size:12.5px;font-family:inherit;text-align:left;cursor:pointer;
+  transition:border-color .25s,background .25s,transform .2s var(--ease,cubic-bezier(.16,1,.3,1));
+}
+.hero-cta:hover{
+  border-color:color-mix(in srgb,var(--accent) 48%, transparent);
+  background:linear-gradient(90deg,rgba(122,168,255,.16),rgba(167,139,250,.08) 62%,transparent);
+  transform:translateY(-1px);
+}
+.hero-cta:active{transform:translateY(0) scale(.995)}
+.hc-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;
+  box-shadow:0 0 10px var(--accent);
+}
+.hc-txt{flex:1;line-height:1.5}
+.hc-txt b{color:var(--tx);font-weight:600}
+.hc-arrow{color:var(--accent);font-size:14px;flex:none;transition:transform .22s}
+.hero-cta:hover .hc-arrow{transform:translateX(3px)}
